@@ -263,18 +263,19 @@ _prompt() {
 
 ENV_DOMAIN=""
 while [[ -z "$ENV_DOMAIN" ]]; do
-    ENV_DOMAIN=$(_prompt "Domain (z.B. example.com)")
+    ENV_DOMAIN=$(_prompt "Domain – öffentlich für Let's Encrypt (z.B. example.com) oder lokal (z.B. apphost.lan)")
 done
 
-ENV_ACME_EMAIL=""
-while [[ -z "$ENV_ACME_EMAIL" ]]; do
-    ENV_ACME_EMAIL=$(_prompt "ACME E-Mail (Let's Encrypt)")
-done
+# Der Cloudflare-Token ist OPTIONAL. Leer lassen für rein lokalen Betrieb ohne
+# Let's Encrypt: Traefik serviert dann automatisch ein self-signed Zertifikat
+# (einmalige Browser-Warnung). Die Let's-Encrypt-/Cloudflare-Config bleibt
+# erhalten – trägt man später eine echte Domain + Token in die .env ein, holt
+# Traefik beim nächsten Start automatisch echte Zertifikate.
+# Die ACME-E-Mail hat einen Default, damit die Traefik-Config nie eine leere
+# E-Mail enthält (bei leerem Token wird ACME ohnehin nicht durchlaufen).
+ENV_ACME_EMAIL=$(_prompt "ACME E-Mail (Let's Encrypt)" "admin@$ENV_DOMAIN")
 
-ENV_CF_TOKEN=""
-while [[ -z "$ENV_CF_TOKEN" ]]; do
-    ENV_CF_TOKEN=$(_prompt "Cloudflare API Token" "" secret)
-done
+ENV_CF_TOKEN=$(_prompt "Cloudflare API Token – optional, leer = self-signed" "" secret)
 
 ENV_AUTH_USER=$(_prompt "Authelia Admin-Nutzer" "admin")
 ENV_AUTH_EMAIL=$(_prompt "Authelia Admin-E-Mail" "$ENV_ACME_EMAIL")
