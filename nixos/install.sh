@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NIX_FLAGS=(--extra-experimental-features "nix-command flakes")
-APP_DIR=/mnt/opt/monorepo/apphost
+APP_DIR=/mnt/opt/monorepo
 
 # Ein bisschen Farbe tut dem ganzen ja nicht weh. 
 R='\033[0;31m' G='\033[0;32m' Y='\033[1;33m' B='\033[0;34m' N='\033[0m'
@@ -22,7 +22,7 @@ echo "  Repo:    $REPO_DIR"
 echo "  Dieses Skript:"
 echo "  - partitioniert eine Festplatte (GPT + EFI + Swap + Btrfs)"
 echo "  - installiert NixOS mit der AppHost-Hochsicherheitskonfiguration"
-echo "  - legt den AppHost-Stack unter /opt/monorepo/apphost bereit"
+echo "  - legt den AppHost-Stack unter /opt/monorepo bereit"
 echo ""
 
 echo ""
@@ -97,7 +97,7 @@ fi
 
 cat > "$REPO_DIR/nixos/ssh-key.nix" << NIXEOF
 # Automatisch von nixos/install.sh gesetzt. Nachträglich änderbar durch Bearbeiten dieser Datei und anschließendes:
-# >  sudo nixos-rebuild switch --flake /opt/monorepo/apphost#apphost
+# >  sudo nixos-rebuild switch --flake /opt/monorepo#apphost
 [
   "$SSH_PUBKEY"
 ]
@@ -190,7 +190,7 @@ if nixos-enter --root /mnt -- /nix/var/nix/profiles/system/bin/switch-to-configu
   info "Bootloader installiert"
 else
   warn "Bootloader-Installation fehlgeschlagen – nach dem Neustart manuell:"
-  warn "  sudo nixos-rebuild boot --flake /opt/monorepo/apphost#apphost"
+  warn "  sudo nixos-rebuild boot --flake /opt/monorepo#apphost"
 fi
 
 # Das Repo gehört meist dem Nutzer, der es geklont hat (z.B. "nixos"), während dieses
@@ -230,10 +230,10 @@ fi
 # (regen-secrets & so laufen ohne sudo). Namen "apphost"/"docker" lösen nur innerhalb des Ziel-Systems auf, daher via nixos-enter.
 nixos-enter --root /mnt -- bash -c '
   set -euo pipefail
-  mkdir -p /opt/monorepo/apphost/data /opt/monorepo/apphost/secrets
-  chown -R apphost:docker /opt/monorepo/apphost
-  chmod 0750 /opt/monorepo/apphost /opt/monorepo/apphost/compose /opt/monorepo/apphost/config /opt/monorepo/apphost/data
-  chmod 0700 /opt/monorepo/apphost/secrets
+  mkdir -p /opt/monorepo/data /opt/monorepo/secrets
+  chown -R apphost:docker /opt/monorepo
+  chmod 0750 /opt/monorepo /opt/monorepo/compose /opt/monorepo/config /opt/monorepo/data
+  chmod 0700 /opt/monorepo/secrets
 '
 
 # .env konfigurieren
@@ -241,7 +241,7 @@ echo ""
 echo -e "  ${B}Konfiguration${N}"
 echo -e "  Alle Dienst-Passwörter und -Secrets (Immich, Paperless, OpenCloud, Collabora,"
 echo -e "  Garage, Grafana, Vaultwarden, Ntfy) werden automatisch generiert."
-echo -e "  Alle Werte können nach dem Neustart in /opt/monorepo/apphost/.env geändert werden."
+echo -e "  Alle Werte können nach dem Neustart in /opt/monorepo/.env geändert werden."
 echo ""
 
 _prompt() {
@@ -370,7 +370,7 @@ mkdir -p "$APP_DIR/secrets"
 printf '%s\n' "$ENV_VAULTWARDEN_TOKEN_PLAIN" > "$APP_DIR/secrets/vaultwarden_admin_token.txt"
 chmod 600 "$APP_DIR/secrets/vaultwarden_admin_token.txt"
 unset ENV_VAULTWARDEN_TOKEN_PLAIN
-info "Vaultwarden Admin-Token gespeichert: /opt/monorepo/apphost/secrets/vaultwarden_admin_token.txt"
+info "Vaultwarden Admin-Token gespeichert: /opt/monorepo/secrets/vaultwarden_admin_token.txt"
 
 # Secrets generieren (läuft im Live-System, nix ist verfügbar)
 info "Generiere Secrets (lädt benötigte Nix-Pakete, dauert einen Moment...)"
@@ -381,7 +381,7 @@ for script in update-secrets-authelia update-secrets-ntfy; do
         info "${script} ✓"
     else
         warn "${script} fehlgeschlagen – nach Neustart manuell ausführen:"
-        warn "  bash /opt/monorepo/apphost/scripts/${script}.sh"
+        warn "  bash /opt/monorepo/scripts/${script}.sh"
     fi
 done
 
@@ -393,10 +393,10 @@ echo ""
 echo -e "  ${B}Nach dem Neustart:${N}"
 echo ""
 echo -e "  ${B}1.${N} SSH-Login:     ssh apphost@<IP-ADRESSE>"
-echo -e "  ${B}2.${N} Stack starten: cd /opt/monorepo/apphost && docker compose up -d"
-echo -e "  ${B}3.${N} Tor-Adresse:   bash /opt/monorepo/apphost/scripts/show-onion-address.sh"
+echo -e "  ${B}2.${N} Stack starten: cd /opt/monorepo && docker compose up -d"
+echo -e "  ${B}3.${N} Tor-Adresse:   bash /opt/monorepo/scripts/show-onion-address.sh"
 echo -e "            TOR_DOMAIN in .env eintragen, danach: docker compose up -d"
-echo -e "  ${B}4.${N} Vaultwarden Admin-Token: cat /opt/monorepo/apphost/secrets/vaultwarden_admin_token.txt"
+echo -e "  ${B}4.${N} Vaultwarden Admin-Token: cat /opt/monorepo/secrets/vaultwarden_admin_token.txt"
 echo ""
 
 for i in 5 4 3 2 1; do

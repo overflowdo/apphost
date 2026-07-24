@@ -273,25 +273,25 @@
     pull = "cd /opt/monorepo && sudo git pull";
 
     # NixOS rebuilden
-    rebuild      = "sudo nixos-rebuild switch --flake path:/opt/monorepo/apphost#apphost";
-    rebuild-boot = "sudo nixos-rebuild boot   --flake path:/opt/monorepo/apphost#apphost";
+    rebuild      = "sudo nixos-rebuild switch --flake path:/opt/monorepo#apphost";
+    rebuild-boot = "sudo nixos-rebuild boot   --flake path:/opt/monorepo#apphost";
 
     # Updates holen, Flake-Inputs aktualisieren + sofort rebuilden
-    update = "pull && cd /opt/monorepo/apphost && sudo nix flake update && sudo nixos-rebuild switch --flake path:/opt/monorepo/apphost#apphost";
+    update = "pull && cd /opt/monorepo && sudo nix flake update && sudo nixos-rebuild switch --flake path:/opt/monorepo#apphost";
 
     # Nix-Store aufräumen
     gc = "sudo nix-collect-garbage --delete-older-than 30d && sudo nix store optimise";
 
     # Docker-Stack
-    up   = "cd /opt/monorepo/apphost && docker compose up -d";
-    down = "cd /opt/monorepo/apphost && docker compose down";
-    logs = "cd /opt/monorepo/apphost && docker compose logs -f";
+    up   = "cd /opt/monorepo && docker compose up -d";
+    down = "cd /opt/monorepo && docker compose down";
+    logs = "cd /opt/monorepo && docker compose logs -f";
 
     # Schnellstatus
     status = "systemctl status --no-pager docker && docker ps";
 
     # Secrets neu generieren (nach Passwortänderungen in .env)
-    regen-secrets = "cd /opt/monorepo/apphost && bash scripts/update-secrets-authelia.sh && bash scripts/update-secrets-ntfy.sh";
+    regen-secrets = "cd /opt/monorepo && bash scripts/update-secrets-authelia.sh && bash scripts/update-secrets-ntfy.sh";
   };
 
   # SSH – maximale Härtung
@@ -360,7 +360,7 @@
   # Automatische Updates (flake-basiert, zieht vom lokalen Repository)
   system.autoUpgrade = {
     enable        = true;
-    flake         = "/opt/monorepo/apphost";
+    flake         = "/opt/monorepo";
     allowReboot   = false;            # Manueller Reboot nach Kernel-Updates
     dates         = "04:30";
     flags         = [ "--no-build-output" ];
