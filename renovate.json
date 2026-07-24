@@ -12,16 +12,15 @@
   "reviewers": [],
 
   "ignorePaths": [
-    "apphost/.env",
-    "apphost/scripts/**",
-    "apphost/secrets/**",
-    "KI-Evaluaion/**"
+    ".env",
+    "scripts/**",
+    "secrets/**"
   ],
 
   "docker-compose": {
     "managerFilePatterns": [
       "/(^|/)(?:docker-)?compose[^/]*\\.ya?ml$/",
-      "/(^|/)apphost/compose/.+\\.ya?ml$/"
+      "/(^|/)compose/.+\\.ya?ml$/"
     ]
   },
 
