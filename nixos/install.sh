@@ -207,16 +207,17 @@ if [[ -n "$MONOREPO_REMOTE" ]]; then
   APPHOST_SUBDIR="$(realpath --relative-to="$MONOREPO_ROOT" "$REPO_DIR")"
   CHECKOUT_DIR="/mnt/opt/monorepo"
 
-  info "Richte aktualisierbares Git-Repo unter /opt/monorepo ein (Sparse-Checkout: $APPHOST_SUBDIR)..."
+  info "Richte aktualisierbares Git-Repo unter /opt/monorepo ein..."
   mkdir -p /mnt/opt
-  git clone --no-checkout --branch "$MONOREPO_BRANCH" "$MONOREPO_ROOT" "$CHECKOUT_DIR"
+  # Standalone-Repo: komplettes Repo auschecken. (Der frühere Sparse-Checkout
+  # stammte aus der Monorepo-Zeit, in der nur das Unterverzeichnis apphost/
+  # ausgecheckt wurde; bei APPHOST_SUBDIR="." würde er die Unterordner
+  # nixos/, compose/, config/ nicht mit auschecken.)
+  git clone --branch "$MONOREPO_BRANCH" "$MONOREPO_ROOT" "$CHECKOUT_DIR"
   git -C "$CHECKOUT_DIR" remote set-url origin "$MONOREPO_REMOTE"
-  git -C "$CHECKOUT_DIR" sparse-checkout init --cone
-  git -C "$CHECKOUT_DIR" sparse-checkout set "$APPHOST_SUBDIR"
-  git -C "$CHECKOUT_DIR" reset --hard "$MONOREPO_BRANCH"
 
   # Maschinenspezifische Dateien sind gitignored (siehe .gitignore) und daher nach dem
-  # Sparse-Checkout nicht vorhanden. Aus $REPO_DIR nachziehen, wo sie in diesem Lauf gerade frisch erzeugt wurden.
+  # Checkout nicht vorhanden. Aus $REPO_DIR nachziehen, wo sie in diesem Lauf gerade frisch erzeugt wurden.
   for f in nixos/hardware-configuration.nix nixos/ssh-key.nix nixos/disk-encryption.nix; do
     cp "$REPO_DIR/$f" "$APP_DIR/$f"
   done
