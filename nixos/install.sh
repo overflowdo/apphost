@@ -227,6 +227,14 @@ else
   cp -r "$REPO_DIR"/. "$APP_DIR"
 fi
 
+# .env konfigurieren
+echo ""
+echo -e "  ${B}Konfiguration${N}"
+echo -e "  Alle Dienst-Passwörter und -Secrets (Immich, Paperless, OpenCloud, Collabora,"
+echo -e "  Garage, Grafana, Vaultwarden, Ntfy) werden automatisch generiert."
+echo -e "  Alle Werte können nach dem Neustart in /opt/monorepo/.env geändert werden."
+echo ""
+
 # data/ und secrets/ sind nicht Teil des Git-Checkouts (siehe .gitignore). Hier mit Besitz/Rechten für den apphost-Nutzer
 # (regen-secrets & so laufen ohne sudo). Namen "apphost"/"docker" lösen nur innerhalb des Ziel-Systems auf, daher via nixos-enter.
 nixos-enter --root /mnt -- bash -c '
@@ -236,14 +244,6 @@ nixos-enter --root /mnt -- bash -c '
   chmod 0750 /opt/monorepo /opt/monorepo/compose /opt/monorepo/config /opt/monorepo/data
   chmod 0700 /opt/monorepo/secrets
 '
-
-# .env konfigurieren
-echo ""
-echo -e "  ${B}Konfiguration${N}"
-echo -e "  Alle Dienst-Passwörter und -Secrets (Immich, Paperless, OpenCloud, Collabora,"
-echo -e "  Garage, Grafana, Vaultwarden, Ntfy) werden automatisch generiert."
-echo -e "  Alle Werte können nach dem Neustart in /opt/monorepo/.env geändert werden."
-echo ""
 
 _prompt() {
     local label="$1" default="${2:-}" silent="${3:-}"
