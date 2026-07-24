@@ -1,7 +1,6 @@
 name: apphost
 volumes:
   paperless_data: {name: apphost_paperless_data}
-  paperless_media: {name: apphost_paperless_media}
   paperless_consume: {name: apphost_paperless_consume}
   paperless_export: {name: apphost_paperless_export}
   paperless_redis: {name: apphost_paperless_redis}
@@ -20,7 +19,7 @@ services:
       traefik-public: {}
     volumes:
       - paperless_data:/usr/src/paperless/data
-      - paperless_media:/usr/src/paperless/media
+      - /mnt/media/paperless:/usr/src/paperless/media
       - paperless_consume:/usr/src/paperless/consume
       - paperless_export:/usr/src/paperless/export
     env_file:

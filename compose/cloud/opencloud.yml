@@ -1,7 +1,6 @@
 name: apphost
 volumes:
   opencloud_config: {name: apphost_opencloud_config}
-  opencloud_data: {name: apphost_opencloud_data}
 services:
   opencloud:
     image: opencloudeu/opencloud-rolling:7.0.0@sha256:ecc240e0df7802e6e6517762009890a3aa36e566d9e6309b80ee2f3dd040e235
@@ -18,7 +17,7 @@ services:
       traefik-public: {}
     volumes:
       - opencloud_config:/etc/opencloud
-      - opencloud_data:/var/lib/opencloud
+      - /mnt/media/opencloud:/var/lib/opencloud
       - ../../config/opencloud/csp.yaml:/etc/opencloud/csp.yaml:ro
     environment:
       OC_URL: https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}

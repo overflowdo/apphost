@@ -13,7 +13,7 @@ services:
     volumes:
       - jellyfin_config:/config
       - jellyfin_cache:/cache
-      - ${MEDIA_DIR:-/mnt/media}:/media:ro
+      - ${MEDIA_DIR:-/mnt/media}/jellyfin:/media:ro
       # Hardware-Transcoding
       # - /dev/dri:/dev/dri
     environment:

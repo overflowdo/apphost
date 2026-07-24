@@ -1,6 +1,5 @@
 name: apphost
 volumes:
-  immich_upload: {name: apphost_immich_upload}
   immich_postgres: {name: apphost_immich_postgres}
   immich_redis: {name: apphost_immich_redis}
   immich_ml_cache: {name: apphost_immich_ml_cache}
@@ -23,7 +22,7 @@ services:
         aliases: [immich-server]
       traefik-public: {}
     volumes:
-      - immich_upload:/data
+      - /mnt/media/immich:/data
       - /etc/localtime:/etc/localtime:ro
     environment:
       DB_HOSTNAME: immich-postgres
