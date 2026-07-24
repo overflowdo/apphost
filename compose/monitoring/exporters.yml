@@ -1,0 +1,115 @@
+name: apphost
+volumes:
+  alloy_data: {name: apphost_alloy_data}
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.11.1@sha256:e9cff4fc67b1818f8c97adb115b9f12c9a54b533de86765d4a0effc01b357205
+    container_name: node-exporter
+    restart: unless-stopped
+    runtime: runc
+    network_mode: host
+    userns_mode: "host"
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 64M}
+    labels:
+      - "traefik.enable=false"
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.54.1@sha256:bc8acf1ad463294f25f3ad34262bc524cb9ec8401d1442953045d59fb8e9119a
+    container_name: cadvisor
+    restart: unless-stopped
+    runtime: runc
+    networks: [monitoring-network]
+    privileged: true
+    userns_mode: "host"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    security_opt: ['no-new-privileges:true']
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 256M}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=false"
+  # redis_exporter für die immich-Valkey-Instanz (ohne Passwort, media-network)
+  immich-redis-exporter:
+    image: oliver006/redis_exporter:v1.86.0-alpine@sha256:755a0b4cbcc86c4843b167c830674e52b63f9467c934b8ccb811b4f506e197f0
+    container_name: immich-redis-exporter
+    restart: unless-stopped
+    runtime: runc
+    networks: [media-network, monitoring-network]
+    environment:
+      REDIS_ADDR: redis://immich-redis:6379
+      TZ: Europe/Berlin
+    user: "65534:65534"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 64M}
+    labels:
+      - "traefik.enable=false"
+  # redis_exporter für die paperless-Valkey-Instanz (Passwort, documents-network)
+  paperless-redis-exporter:
+    image: oliver006/redis_exporter:v1.86.0-alpine@sha256:755a0b4cbcc86c4843b167c830674e52b63f9467c934b8ccb811b4f506e197f0
+    container_name: paperless-redis-exporter
+    restart: unless-stopped
+    runtime: runc
+    networks: [documents-network, monitoring-network]
+    environment:
+      REDIS_ADDR: redis://paperless-redis:6379
+      REDIS_PASSWORD: ${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}
+      TZ: Europe/Berlin
+    user: "65534:65534"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 64M}
+    labels:
+      - "traefik.enable=false"
+  alloy:
+    image: grafana/alloy:v1.17.1@sha256:4f6ddc56ffdcf8a6316748fc5162972e20cb301523cac1bb4a31957df733ae9b
+    container_name: alloy
+    restart: unless-stopped
+    runtime: runc
+    networks: [monitoring-network]
+    userns_mode: "host"
+    volumes:
+      - ../../config/alloy:/etc/alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /run/docker.sock:/run/docker.sock:ro
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    security_opt: ['no-new-privileges:true']
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 128M}
+    labels:
+      - "traefik.enable=false"

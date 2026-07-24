@@ -1,0 +1,15 @@
+# =============================================================================
+# Homepage – Service-Konfiguration
+# Dienste sind via Docker-Labels auto-discoverable (siehe compose-Labels).
+# Diese Datei kann für manuelle Einträge oder Gruppen-Sortierung genutzt werden.
+# Docs: https://gethomepage.dev/configs/services/
+# =============================================================================
+
+# Automatische Service-Discovery via Docker-Labels ist aktiviert.
+# Manuelle Einträge hier können zusätzlich ergänzt werden:
+
+# - Infrastruktur:
+#     - Router:
+#         href: https://router.local
+#         icon: router.png
+#         description: Heimnetz-Router

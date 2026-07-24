@@ -1,0 +1,59 @@
+name: apphost
+volumes:
+  prometheus_data: {name: apphost_prometheus_data}
+services:
+  prometheus:
+    image: prom/prometheus:v3.12.0@sha256:69f5241418838263316593f7274a304b095c40bcf22e57272865da91bd60a8ac
+    container_name: prometheus
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      monitoring-network: {}
+      traefik-public: {}
+      media-network: {}
+      storage-network: {}
+    volumes:
+      - prometheus_data:/prometheus
+      - ../../config/prometheus:/etc/prometheus:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-90d}"
+      - "--storage.tsdb.retention.size=50GB"
+      - "--web.enable-lifecycle"
+      - "--no-web.enable-admin-api"
+      - "--web.external-url=https://prometheus.${DOMAIN}"
+      - "--log.level=warn"
+    environment:
+      TZ: Europe/Berlin
+    user: "65534:65534"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "4.0", memory: 4G}
+        reservations: {memory: 512M}
+    ulimits:
+      nofile: {soft: 65536, hard: 65536}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.routers.prometheus.middlewares=authelia-chain@file"
+      - "traefik.http.routers.prometheus-tor.rule=HostRegexp(`^prometheus\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.prometheus-tor.entrypoints=tor-http"
+      - "traefik.http.routers.prometheus-tor.service=prometheus"
+      - "traefik.http.routers.prometheus-tor.middlewares=tor-authelia-chain@file"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Prometheus"
+      - "homepage.icon=prometheus.png"
+      - "homepage.href=https://prometheus.${DOMAIN}"

@@ -1,0 +1,57 @@
+global:
+  resolve_timeout: 5m
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+route:
+  # Standard-Receiver
+  receiver: "ntfy-critical"
+  group_by: ["alertname", "cluster", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  routes:
+    # Kritische Alerts: sofort via Ntfy
+    - match:
+        severity: critical
+      receiver: ntfy-critical
+      repeat_interval: 1h
+      continue: true
+    # Warnungen: gebündelt alle 5 Minuten
+    - match:
+        severity: warning
+      receiver: ntfy-warning
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 6h
+      continue: true
+    # Null route Watchdog-Alerts
+    - match:
+        alertname: Watchdog
+      receiver: "null"
+receivers:
+  # Null-Receiver (für stille Alerts)
+  - name: "null"
+  # Kritische Alerts (hohe Priorität)
+  - name: ntfy-critical
+    webhook_configs:
+      - url: "http://ntfy:80/apphost-critical"
+        send_resolved: true
+        http_config:
+          bearer_token: "${NTFY_ADMIN_TOKEN}"
+  # Warnungen (normale Priorität)
+  - name: ntfy-warning
+    webhook_configs:
+      - url: "http://ntfy:80/apphost-warnings"
+        send_resolved: true
+        http_config:
+          bearer_token: "${NTFY_ADMIN_TOKEN}"
+inhibit_rules:
+  # Kritische Alerts inhibieren Warnungen des gleichen Services
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal:
+      - alertname
+      - cluster
+      - service

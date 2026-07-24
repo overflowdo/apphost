@@ -1,0 +1,113 @@
+name: apphost
+volumes:
+  opencloud_config: {name: apphost_opencloud_config}
+  opencloud_data: {name: apphost_opencloud_data}
+services:
+  opencloud:
+    image: opencloudeu/opencloud-rolling:7.0.0@sha256:ecc240e0df7802e6e6517762009890a3aa36e566d9e6309b80ee2f3dd040e235
+    container_name: opencloud
+    restart: unless-stopped
+    runtime: runc
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "opencloud init || true && opencloud server"
+    networks:
+      cloud-network:
+        aliases: [opencloud, ocis]
+      traefik-public: {}
+    volumes:
+      - opencloud_config:/etc/opencloud
+      - opencloud_data:/var/lib/opencloud
+      - ../../config/opencloud/csp.yaml:/etc/opencloud/csp.yaml:ro
+    environment:
+      OC_URL: https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}
+      OC_LOG_LEVEL: info
+      TZ: Europe/Berlin
+      OC_INSECURE: "false"
+      PROXY_TLS: "false"
+      IDM_ADMIN_PASSWORD: ${OPENCLOUD_ADMIN_PASSWORD:?}
+      IDM_CREATE_DEMO_USERS: "false"
+      OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD: "false"
+      STORAGE_USERS_POSIX_WATCH_FS: "true"
+      NATS_NATS_HOST: 0.0.0.0
+      GATEWAY_GRPC_ADDR: 0.0.0.0:9142
+      FRONTEND_APP_HANDLER_SECURE_VIEW_APP_ADDR: eu.opencloud.api.collaboration
+      GRAPH_AVAILABLE_ROLES: "b1e2218d-eef8-4d4c-b82d-0f1a1b48f3b5,a8d5fe5e-96e3-418d-825b-534dbdf22b99,fb6c3e19-e378-47e5-b277-9732f9de6e21,58c63c02-1d89-4572-916a-870abc5a1b7d,2d00ce52-1fc2-4dbc-8b95-a73b73395f5a,1c996275-f1c9-4e71-abdf-a42f6495e960,312c0871-5ef7-4b3a-85b6-0e4074c64049,aa97fe03-7980-45ac-9e50-b325749fd7e6"
+      PROXY_CSP_CONFIG_FILE_LOCATION: /etc/opencloud/csp.yaml
+      DOMAIN: ${DOMAIN}
+      AUTHELIA_SUBDOMAIN: ${AUTHELIA_SUBDOMAIN:-auth}
+      COLLABORA_SUBDOMAIN: ${COLLABORA_SUBDOMAIN:-office}
+      FRONTEND_CHECK_FOR_UPDATES: "false"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "4.0", memory: 2G}
+        reservations: {memory: 512M}
+    ulimits:
+      nofile: {soft: 65536, hard: 65536}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9200/healthz"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.opencloud.rule=Host(`${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}`)"
+      - "traefik.http.routers.opencloud.entrypoints=websecure"
+      - "traefik.http.services.opencloud.loadbalancer.server.port=9200"
+      - "traefik.http.routers.opencloud.middlewares=opencloud-chain@file"
+      - "traefik.http.routers.opencloud-tor.rule=HostRegexp(`^${OPENCLOUD_SUBDOMAIN:-cloud}\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.opencloud-tor.entrypoints=tor-http"
+      - "traefik.http.routers.opencloud-tor.service=opencloud"
+      - "traefik.http.routers.opencloud-tor.middlewares=tor-opencloud-chain@file"
+      - "homepage.group=Cloud"
+      - "homepage.name=OpenCloud"
+      - "homepage.icon=owncloud.png"
+      - "homepage.href=https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}"
+  collaboration:
+    image: opencloudeu/opencloud-rolling:7.0.0@sha256:ecc240e0df7802e6e6517762009890a3aa36e566d9e6309b80ee2f3dd040e235
+    container_name: collaboration
+    restart: always
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    networks:
+      cloud-network: {}
+      traefik-public: {}
+    depends_on:
+      opencloud:
+        condition: service_started
+      collabora:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+    command: ["-c", "opencloud collaboration server"]
+    environment:
+      COLLABORATION_GRPC_ADDR: 0.0.0.0:9301
+      COLLABORATION_HTTP_ADDR: 0.0.0.0:9300
+      MICRO_REGISTRY: "nats-js-kv"
+      MICRO_REGISTRY_ADDRESS: "opencloud:9233"
+      COLLABORATION_WOPI_SRC: https://${WOPISERVER_SUBDOMAIN:-wopi}.${DOMAIN}
+      COLLABORATION_APP_NAME: "CollaboraOnline"
+      COLLABORATION_APP_PRODUCT: "Collabora"
+      COLLABORATION_APP_ADDR: https://${COLLABORA_SUBDOMAIN:-office}.${DOMAIN}
+      COLLABORATION_APP_ICON: https://${COLLABORA_SUBDOMAIN:-office}.${DOMAIN}/favicon.ico
+      COLLABORATION_APP_INSECURE: "true"
+      COLLABORATION_CS3API_DATAGATEWAY_INSECURE: "true"
+      COLLABORATION_LOG_LEVEL: "info"
+      OC_URL: https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}
+    volumes:
+      - opencloud_config:/etc/opencloud
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.collaboration.entrypoints=websecure"
+      - "traefik.http.routers.collaboration.rule=Host(`${WOPISERVER_SUBDOMAIN:-wopi}.${DOMAIN}`)"
+      - "traefik.http.routers.collaboration.service=collaboration"
+      - "traefik.http.routers.collaboration.middlewares=default-chain@file"
+      - "traefik.http.services.collaboration.loadbalancer.server.port=9300"

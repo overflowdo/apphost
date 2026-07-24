@@ -1,0 +1,13 @@
+# Ntfy Server-Konfiguration
+cache-file: /var/lib/ntfy/cache.db"
+# Authentifizierung
+auth-file: /var/lib/ntfy/users.db
+auth-default-access: deny-all
+enable-login: true
+require-login: true
+# Upload
+attachment-cache-dir: /var/lib/ntfy/attachments
+# Logging
+log-format: json
+# Reverse Proxy
+behind-proxy: true

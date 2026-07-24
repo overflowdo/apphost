@@ -1,0 +1,26 @@
+name: apphost
+volumes:
+  loki_data: {name: apphost_loki_data}
+services:
+  loki:
+    image: grafana/loki:3.7.2@sha256:191d4fdfb7264f16989f0a57f320872620a5a7c2ceeec6229212c4190ec49b86
+    container_name: loki
+    restart: unless-stopped
+    runtime: runc
+    networks: [monitoring-network]
+    volumes:
+      - loki_data:/loki
+      - ../../config/loki:/etc/loki:ro
+    command: -config.file=/etc/loki/config.yml
+    user: "10001:10001"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /wal:size=512m,mode=0755
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 1G}
+        reservations: {memory: 256M}
+    labels:
+      - "traefik.enable=false"

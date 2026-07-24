@@ -1,0 +1,26 @@
+# Logging
+DataDirectory /var/lib/tor
+Log notice stdout
+
+# Kein ausgehender Exit-Node
+ExitPolicy reject *:*
+ExitRelay 0
+
+# Der Onlion Service leitet eingehende Tor-Verbindungen an Traefik weiter.
+HiddenServiceDir /var/lib/tor/hidden_service
+HiddenServiceVersion 3
+
+# Port 443 -> Traefik tor-http-Entrypoint (TLS, selbstsigniertes Zertifikat)
+HiddenServicePort 443 172.23.1.2:8880
+# Port 80  -> Traefik 'web'-Entrypoint (308-Redirect auf https://…onion)
+HiddenServicePort 80 172.23.1.2:8081
+
+# Relay Deaktivieren
+SocksPort 0              # Kein SOCKS-Proxy
+ControlPort 0            # Kein Control-Port benötigt
+
+# Netzwerk-Isolation
+ClientOnly 1             # Nur als Client agieren (kein Relay)
+
+NumCPUs 1
+CircuitBuildTimeout 60

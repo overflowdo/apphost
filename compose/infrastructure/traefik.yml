@@ -1,0 +1,144 @@
+name: apphost
+volumes:
+  traefik_certs:
+    name: apphost_traefik_certs
+  traefik_config:
+    name: apphost_traefik_config
+services:
+  # Init-Container: rendert traefik.yml aus dem Template (Platzhalter aus .env)
+  # bei jedem Start und beendet sich.
+  traefik-init:
+    image: traefik:v3.7.1@sha256:6b9cbca6fac42ab0075f5437d8dc1685cfd188626d8d515839ea94f8b6271c42
+    container_name: traefik-init
+    restart: "no"
+    runtime: runc
+    network_mode: "none"
+    entrypoint: ["/bin/sh", "/src/render.sh"]
+    volumes:
+      - ../../config/traefik:/src:ro
+      - traefik_config:/rendered
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      ACME_DNS_PROVIDER: ${ACME_DNS_PROVIDER}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 64M}
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
+    container_name: socket-proxy
+    restart: unless-stopped
+    runtime: runc
+    userns_mode: "host"
+    networks:
+      - socket-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      EVENTS: 1
+      PING: 1
+      VERSION: 1
+      POST: 0
+      DELETE: 0
+      PUT: 0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /run:size=16m,mode=0755
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 64M}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2375/version"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+    labels:
+      - "traefik.enable=false"
+  traefik:
+    image: traefik:v3.7.1@sha256:6b9cbca6fac42ab0075f5437d8dc1685cfd188626d8d515839ea94f8b6271c42
+    container_name: traefik
+    restart: unless-stopped
+    runtime: runc
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+      traefik-init:
+        condition: service_completed_successfully
+    # Statische Konfiguration aus der vom Init-Container gerenderten Datei lesen.
+    # --configFile umgeht die Default-Suche in /etc/traefik; die dortige
+    # traefik.template.yml wird dadurch nicht als Config interpretiert.
+    command:
+      - "--configFile=/rendered/traefik.yml"
+    networks:
+      traefik-public:
+        ipv4_address: 172.23.1.2
+      socket-proxy: {}
+    ports:
+      - "80:8081"
+      - "443:8443"
+      - "443:8443/udp" # HTTP/3 QUIC
+    volumes:
+      # Zertifikate: named volume (persistent, Traefik erstellt acme.json selbst)
+      - traefik_certs:/certs
+      # Gerenderte statische Konfiguration (traefik.yml) vom Init-Container
+      - traefik_config:/rendered:ro
+      # Restliche Konfiguration aus dem Repo (v.a. das dynamische Verzeichnis
+      # /etc/traefik/dynamic, auf das der file-Provider zeigt)
+      - ../../config/traefik:/etc/traefik:ro
+    environment:
+      TZ: Europe/Berlin
+      # Hetzner:
+      HETZNER_API_KEY: ${HETZNER_API_KEY:-}
+      # Cloudflare:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:-}
+      # HINWEIS: Statische Traefik-Optionen (ACME-Email, Domains, DNS-Provider)
+      # lassen sich hier NICHT per TRAEFIK_*-Umgebungsvariable setzen: Sobald
+      # eine Konfigurationsdatei existiert, ignoriert Traefik alle TRAEFIK_*-
+      # Variablen für die statische Konfiguration (die Quellen sind gegenseitig
+      # ausschließend). Diese Werte rendert deshalb der traefik-init-Container
+      # aus der .env in die traefik.yml. Nur echte Laufzeit-Variablen des
+      # DNS-Providers (HETZNER_API_KEY, CF_DNS_API_TOKEN, TZ) gehören hierher.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 512M}
+        reservations: {cpus: "0.25", memory: 128M}
+    ulimits:
+      nofile: {soft: 65536, hard: 65536}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=authelia-chain@file"
+      - "traefik.http.routers.traefik-tor.rule=HostRegexp(`^traefik\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.traefik-tor.entrypoints=tor-http"
+      - "traefik.http.routers.traefik-tor.service=api@internal"
+      - "traefik.http.routers.traefik-tor.middlewares=tor-authelia-chain@file"
+      - "homepage.group=Infrastruktur"
+      - "homepage.name=Traefik"
+      - "homepage.icon=traefik.png"
+      - "homepage.href=https://traefik.${DOMAIN}"
+      - "homepage.description=Reverse Proxy"

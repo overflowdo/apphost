@@ -1,0 +1,86 @@
+# Prometheus Alert-Regeln
+groups:
+  # Host-Alarme
+  - name: host
+    interval: 30s
+    rules:
+      - alert: HostHighCPULoad
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU-Last hoch ({{ $labels.instance }})"
+          description: "CPU-Auslastung: {{ printf \"%.2f\" $value }}%"
+      - alert: HostOutOfMemory
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Wenig RAM verfügbar ({{ $labels.instance }})"
+          description: "Nur {{ printf \"%.2f\" $value }}% RAM verfügbar"
+      - alert: HostDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Wenig Festplattenspeicher ({{ $labels.instance }})"
+          description: "{{ printf \"%.2f\" $value }}% freier Speicher auf /"
+      - alert: HostDiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "KRITISCH: Kein Festplattenspeicher ({{ $labels.instance }})"
+      - alert: HostHighLoad
+        expr: node_load1 > 8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "System-Load hoch: {{ $value }}"
+  # Container-Alarme
+  - name: containers
+    rules:
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name!=""})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container nicht gefunden: {{ $labels.name }}"
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container hoher RAM-Verbrauch: {{ $labels.name }}"
+          description: "{{ printf \"%.2f\" $value }}% des Limits"
+      - alert: ContainerRestarting
+        expr: rate(container_restart_count{name!=""}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container wird häufig neu gestartet: {{ $labels.name }}"
+  # Traefik-Alarme
+  - name: traefik
+    rules:
+      - alert: TraefikHighErrorRate
+        expr: rate(traefik_router_requests_total{code=~"5.."}[5m]) / rate(traefik_router_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Traefik hohe Fehlerrate: {{ $labels.router }}"
+      - alert: TraefikBackendDown
+        expr: traefik_backend_server_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Traefik Backend nicht erreichbar: {{ $labels.backend }}"

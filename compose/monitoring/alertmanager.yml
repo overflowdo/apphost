@@ -1,0 +1,44 @@
+name: apphost
+volumes:
+  alertmanager_data: {name: apphost_alertmanager_data}
+services:
+  alertmanager:
+    image: prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286
+    container_name: alertmanager
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      monitoring-network: {}
+      traefik-public: {}
+      communication-network: {}
+    volumes:
+      - alertmanager_data:/alertmanager
+      - ../../config/alertmanager:/etc/alertmanager:ro
+    command:
+      - "--config.file=/etc/alertmanager/config.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=https://alertmanager.${DOMAIN}"
+      - "--log.level=warn"
+    user: "65534:65534"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 128M}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.${DOMAIN}`)"
+      - "traefik.http.routers.alertmanager.entrypoints=websecure"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+      - "traefik.http.routers.alertmanager.middlewares=authelia-chain@file"
+      - "traefik.http.routers.alertmanager-tor.rule=HostRegexp(`^alertmanager\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.alertmanager-tor.entrypoints=tor-http"
+      - "traefik.http.routers.alertmanager-tor.service=alertmanager"
+      - "traefik.http.routers.alertmanager-tor.middlewares=tor-authelia-chain@file"

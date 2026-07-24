@@ -1,0 +1,137 @@
+# Senden von Nutzungsstatistiken deaktivieren
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+api:
+  dashboard: true
+  debug: false
+  insecure: false
+ping:
+  entryPoint: "traefik-internal"
+# Entry Points
+entryPoints:
+  # HTTP -> Redirect auf HTTPS
+  web:
+    address: ":8081"
+    http:
+      encodedCharacters:
+        allowEncodedSlash: true
+        allowEncodedBackSlash: true
+        allowEncodedNullCharacter: true
+        allowEncodedSemicolon: true
+        allowEncodedPercent: true
+        allowEncodedQuestionMark: true
+        allowEncodedHash: true
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+    forwardedHeaders:
+      insecure: false
+      trustedIPs: ["127.0.0.1/8", "::1/128", "172.16.0.0/12", "192.168.0.0/16"]
+  # HTTPS – TLS 1.3 + HTTP/3 (QUIC/UDP)
+  websecure:
+    address: ":8443"
+    http3:
+      advertisedPort: 443
+    http:
+      encodedCharacters:
+        allowEncodedSlash: true
+        allowEncodedBackSlash: true
+        allowEncodedNullCharacter: true
+        allowEncodedSemicolon: true
+        allowEncodedPercent: true
+        allowEncodedQuestionMark: true
+        allowEncodedHash: true
+      tls:
+        options: strict@file
+        certResolver: letsencrypt
+        domains:
+          - main: "${DOMAIN}"
+            sans:
+              - "*.${DOMAIN}"
+    forwardedHeaders:
+      insecure: false
+      trustedIPs: ["127.0.0.1/8", "::1/128", "172.16.0.0/12", "192.168.0.0/16"]
+    transport:
+      respondingTimeouts:
+        readTimeout: "30s"
+        writeTimeout: "30s"
+        idleTimeout: "120s"
+  traefik-internal:
+    address: ":8080"
+  tor-http:
+    address: ":8880"
+    http:
+      encodedCharacters:
+        allowEncodedSlash: true
+        allowEncodedBackSlash: true
+        allowEncodedNullCharacter: true
+        allowEncodedSemicolon: true
+        allowEncodedPercent: true
+        allowEncodedQuestionMark: true
+        allowEncodedHash: true
+      tls: {}
+# Provider
+providers:
+  docker:
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false
+    network: "traefik-public"
+    watch: true
+  file:
+    directory: "/etc/traefik/dynamic"
+    watch: true
+certificatesResolvers:
+  # Produktions-Zertifikat (Let's Encrypt Prod)
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: "/certs/acme.json"
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      # DNS-01 Challenge
+      dnsChallenge:
+        provider: ${ACME_DNS_PROVIDER}
+        propagation:
+          delayBeforeChecks: "30s"
+        resolvers:
+          - "1.1.1.1:53"
+          - "9.9.9.9:53"
+  # Staging (zum Testen ohne Rate-Limits bei LE)
+  letsencrypt_staging:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: "/certs/acme-staging.json"
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      # DNS-01 Challenge
+      dnsChallenge:
+        provider: ${ACME_DNS_PROVIDER}
+        propagation:
+          delayBeforeChecks: "30s"
+        resolvers: ["1.1.1.1:53", "9.9.9.9:53"]
+# Logging
+log:
+  level: "WARN"
+  format: "json"
+accessLog:
+  format: "json"
+  bufferingSize: 100
+  filters:
+    statusCodes: ["400-599"]
+    retryAttempts: true
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+        X-Forwarded-For: keep
+        Authorization: drop
+        Cookie: drop
+# Metrics
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    entryPoint: "traefik-internal"

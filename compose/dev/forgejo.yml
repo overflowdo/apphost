@@ -1,0 +1,110 @@
+name: apphost
+volumes:
+  forgejo_data: {name: apphost_forgejo_data}
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:15.0.2@sha256:db04c7114b656f896e206ba3873fe8d3a7adf2daa44907037f0274f4ba653fb9
+    container_name: forgejo
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      dev-network: {}
+      traefik-public: {}
+    extra_hosts:
+      - "${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}:172.23.1.2"
+    volumes:
+      - forgejo_data:/data
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      TZ: Europe/Berlin
+      FORGEJO____APP_NAME: "AppHost Git"
+      FORGEJO__server__PROTOCOL: http
+      FORGEJO__server__HTTP_PORT: "3000"
+      FORGEJO__server__ROOT_URL: "https://${FORGEJO_SUBDOMAIN:-git}.${DOMAIN}"
+      FORGEJO__server__DISABLE_SSH: "true"
+      FORGEJO__server__LFS_START_SERVER: "true"
+      FORGEJO__database__DB_TYPE: sqlite3
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__ENABLE_NOTIFY_MAIL: "false"
+      FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION: "true"
+      FORGEJO__oauth2_client__OPENID_CONNECT_SCOPES: "openid profile email"
+      FORGEJO__mailer__ENABLED: "false"
+      FORGEJO__log__LEVEL: info
+      # Reverse-Proxy-Auth NUR für den Onion-Zugriff: ForwardAuth
+      # (tor-authelia-chain) liefert Remote-User -> Forgejo loggt ein / legt an.
+      # Clearnet entfernt den Header (strip-remote-user) -> dort gilt OIDC.
+      # TRUSTED_PROXIES = Traefik-IP, damit kein anderer Container faken kann.
+      FORGEJO__service__ENABLE_REVERSE_PROXY_AUTHENTICATION: "true"
+      FORGEJO__service__ENABLE_REVERSE_PROXY_AUTO_REGISTRATION: "true"
+      FORGEJO__service__ENABLE_REVERSE_PROXY_FULL_NAME: "true"
+      FORGEJO__security__REVERSE_PROXY_AUTHENTICATION_USER: "Remote-User"
+      FORGEJO__security__REVERSE_PROXY_AUTHENTICATION_EMAIL: "Remote-Email"
+      FORGEJO__security__REVERSE_PROXY_AUTHENTICATION_FULL_NAME: "Remote-Name"
+      FORGEJO__security__REVERSE_PROXY_TRUSTED_PROXIES: "172.23.1.2/32"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, CHOWN, DAC_OVERRIDE]
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 1G}
+        reservations: {memory: 128M}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.forgejo.rule=Host(`${FORGEJO_SUBDOMAIN:-git}.${DOMAIN}`)"
+      - "traefik.http.routers.forgejo.entrypoints=websecure"
+      - "traefik.http.services.forgejo.loadbalancer.server.port=3000"
+      - "traefik.http.routers.forgejo.middlewares=strip-remote-user@file,security-headers@file,compress@file"
+      - "traefik.http.routers.forgejo-tor.rule=HostRegexp(`^${FORGEJO_SUBDOMAIN:-git}\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.forgejo-tor.entrypoints=tor-http"
+      - "traefik.http.routers.forgejo-tor.service=forgejo"
+      - "traefik.http.routers.forgejo-tor.middlewares=tor-authelia-chain@file"
+      - "homepage.group=Dev"
+      - "homepage.name=Forgejo"
+      - "homepage.icon=gitea.png"
+      - "homepage.href=https://${FORGEJO_SUBDOMAIN:-git}.${DOMAIN}"
+  forgejo-init:
+    image: codeberg.org/forgejo/forgejo:15.0.2@sha256:db04c7114b656f896e206ba3873fe8d3a7adf2daa44907037f0274f4ba653fb9
+    container_name: forgejo-init
+    restart: "no"
+    runtime: runc
+    depends_on:
+      forgejo:
+        condition: service_healthy
+    networks:
+      - dev-network
+      - traefik-public
+    extra_hosts:
+      - "${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}:172.23.1.2"
+    volumes:
+      - forgejo_data:/data
+      - ../../config/forgejo/oauth-setup.sh:/oauth-setup.sh:ro
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      GITEA_WORK_DIR: /data/gitea
+      GITEA_CUSTOM: /data/gitea/custom
+      HOME: /data/git
+      AUTHELIA_SUBDOMAIN: ${AUTHELIA_SUBDOMAIN:-auth}
+      DOMAIN: ${DOMAIN}
+    env_file:
+      - ../../secrets/oidc-forgejo.env
+    user: "1000:1000"
+    entrypoint: ["/bin/sh", "/oauth-setup.sh"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    labels:
+      - "traefik.enable=false"

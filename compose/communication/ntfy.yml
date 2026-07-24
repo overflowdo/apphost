@@ -1,0 +1,51 @@
+name: apphost
+volumes:
+  ntfy_data: {name: apphost_ntfy_data}
+services:
+  ntfy:
+    image: binwiederhier/ntfy:v2.23.0@sha256:b32b4221a64ec2e7c000f0782b2feef24022e1a09a24e531640f4cbba6cfa1e6
+    container_name: ntfy
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      communication-network:
+        aliases: [ntfy]
+      traefik-public: {}
+    volumes:
+      - ntfy_data:/var/lib/ntfy
+      - ../../config/ntfy/server.yml:/etc/ntfy/server.yml:ro
+    command: serve
+    env_file:
+      - ../../secrets/ntfy.env
+    environment:
+      NTFY_BASE_URL: "https://${NTFY_SUBDOMAIN:-ntfy}.${DOMAIN}"
+      TZ: Europe/Berlin
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 256M}
+        reservations: {memory: 64M}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/v1/health | grep -q '\"healthy\":true'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ntfy.rule=Host(`${NTFY_SUBDOMAIN:-ntfy}.${DOMAIN}`)"
+      - "traefik.http.routers.ntfy.entrypoints=websecure"
+      - "traefik.http.services.ntfy.loadbalancer.server.port=80"
+      - "traefik.http.routers.ntfy.middlewares=default-chain@file"
+      - "traefik.http.routers.ntfy-tor.rule=HostRegexp(`^${NTFY_SUBDOMAIN:-ntfy}\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.ntfy-tor.entrypoints=tor-http"
+      - "traefik.http.routers.ntfy-tor.service=ntfy"
+      - "traefik.http.routers.ntfy-tor.middlewares=tor-chain@file"
+      - "homepage.group=Kommunikation"
+      - "homepage.name=Ntfy"
+      - "homepage.icon=ntfy.png"
+      - "homepage.href=https://${NTFY_SUBDOMAIN:-ntfy}.${DOMAIN}"

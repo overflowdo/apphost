@@ -1,0 +1,41 @@
+name: apphost
+services:
+  bento-pdf:
+    image: ghcr.io/alam00000/bentopdf-simple:2.8.5@sha256:268f3e4a1aeed5d7035b58ab1d679da85b7c559ac3d3c08eb2177520c3647e1f
+    container_name: bento-pdf
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+    environment:
+      TZ: Europe/Berlin
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    tmpfs:
+      - /var/cache/nginx:size=64m,mode=1777
+      - /var/run:size=8m,mode=0755
+      - /etc/nginx/tmp:size=8m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 64M}
+        reservations: {memory: 16M}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bento-pdf.rule=Host(`pdf.${DOMAIN}`)"
+      - "traefik.http.routers.bento-pdf.entrypoints=websecure"
+      - "traefik.http.services.bento-pdf.loadbalancer.server.port=8080"
+      - "traefik.http.routers.bento-pdf.middlewares=default-chain@file"
+      - "traefik.http.routers.bento-pdf-tor.rule=HostRegexp(`^pdf\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.bento-pdf-tor.entrypoints=tor-http"
+      - "traefik.http.routers.bento-pdf-tor.service=bento-pdf"
+      - "traefik.http.routers.bento-pdf-tor.middlewares=tor-chain@file"
+      - "homepage.group=Dokumente"
+      - "homepage.name=PDF-Tools"
+      - "homepage.icon=bentopdf.png"
+      - "homepage.href=https://pdf.${DOMAIN}"

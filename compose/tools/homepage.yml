@@ -1,0 +1,43 @@
+name: apphost
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v1.13.1@sha256:d8d784e5090111b6e4c56dfd90e272d2953a2094e87349f647165df0fa6c4401
+    container_name: homepage
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+      socket-proxy: {} # Docker-Widget via Socket-Proxy
+    volumes:
+      - ../../config/homepage:/app/config
+    environment:
+      TZ: Europe/Berlin
+      DOCKER_HOST: tcp://socket-proxy:2375 # Kein direkter Docker-Socket!
+      LOG_LEVEL: warn
+      HOMEPAGE_ALLOWED_HOSTS: "*" # we handle this through traefik
+    user: "1000:1000"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 256M}
+        reservations: {memory: 64M}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`${HOMEPAGE_SUBDOMAIN:-dashboard}.${DOMAIN}`) || Host(`${DOMAIN}`)"
+      - "traefik.http.routers.homepage.entrypoints=websecure"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+      - "traefik.http.routers.homepage.middlewares=authelia-chain@file"
+      - "traefik.http.routers.homepage-tor.rule=HostRegexp(`^${HOMEPAGE_SUBDOMAIN:-dashboard}\\.[a-z2-7]{16,56}\\.onion`) || HostRegexp(`^[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.homepage-tor.entrypoints=tor-http"
+      - "traefik.http.routers.homepage-tor.service=homepage"
+      - "traefik.http.routers.homepage-tor.middlewares=tor-authelia-chain@file"

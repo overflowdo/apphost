@@ -1,0 +1,197 @@
+log:
+  format: json
+server:
+  address: 'tcp://:9091'
+# 2FA
+totp:
+  disable: false
+  issuer: '{{ env "DOMAIN" }}'
+  algorithm: sha512
+  digits: 6
+  period: 30
+  skew: 1
+webauthn:
+  disable: false
+  display_name: 'AppHost'
+  attestation_conveyance_preference: indirect
+  user_verification: preferred
+  timeout: '60s'
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+    watch: true
+    password:
+      algorithm: argon2id
+      argon2:
+        iterations: 3
+        memory: 65536
+        parallelism: 4
+        key_length: 32
+        salt_length: 16
+storage:
+  # encryption_key kommt aus dem Env AUTHELIA_STORAGE_ENCRYPTION_KEY
+  local:
+    path: /data/db.sqlite3
+notifier:
+  filesystem:
+    filename: /data/notification.txt
+# Brute-Force-Schutz
+regulation:
+  max_retries: 5
+  find_time: '5m'
+  ban_time: '15m'
+# Default: deny -> explizite Regeln für alle erlaubten Domains
+access_control:
+  default_policy: deny
+  rules:
+    # Authelia-Portal selbst: kein Auth
+    - domain: '{{ env "AUTH_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+      policy: bypass
+{{- if env "TOR_DOMAIN" }}
+    - domain: '{{ env "AUTH_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+      policy: bypass
+{{- end }}
+    # ForwardAuth-geschützte Services (kein eigenes OIDC)
+    - domain:
+        - 'prometheus.{{ env "DOMAIN" }}'
+        - 'alertmanager.{{ env "DOMAIN" }}'
+        - '{{ env "HOMEPAGE_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+        - '{{ env "DOMAIN" }}'
+        - 'traefik.{{ env "DOMAIN" }}'
+        - '{{ env "OPENSPEEDTEST_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+        - 'pdf.{{ env "DOMAIN" }}'
+        - '{{ env "BICHON_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+      policy: one_factor
+{{- if env "TOR_DOMAIN" }}
+    - domain:
+        - 'prometheus.{{ env "TOR_DOMAIN" }}'
+        - 'alertmanager.{{ env "TOR_DOMAIN" }}'
+        - '{{ env "HOMEPAGE_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+        - '{{ env "TOR_DOMAIN" }}'
+        - 'traefik.{{ env "TOR_DOMAIN" }}'
+        - '{{ env "OPENSPEEDTEST_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+        - '{{ env "GRAFANA_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+        - '{{ env "FORGEJO_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+        - 'paperless.{{ env "TOR_DOMAIN" }}'
+        - '{{ env "IMMICH_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+      policy: one_factor
+{{- end }}
+    # OIDC-Clients (eigene Auth, aber Authelia als Provider)
+    - domain:
+        - '{{ env "GRAFANA_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+        - '{{ env "IMMICH_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+        - 'paperless.{{ env "DOMAIN" }}'
+        - '{{ env "FORGEJO_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+      policy: one_factor
+identity_validation:
+  reset_password:
+    jwt_lifespan: '5m'
+    jwt_algorithm: 'HS256'
+identity_providers:
+  oidc:
+    jwks:
+      - key_id: main
+        algorithm: RS256
+        use: sig
+        key: |
+          {{- fileContent "/config/oidc_jwks.pem" | nindent 10 }}
+    cors:
+      endpoints:
+        - authorization
+        - token
+        - revocation
+        - introspection
+        - userinfo
+      allowed_origins_from_client_redirect_uris: true
+    clients:
+      # Grafana (OIDC nativ)
+      - client_id: grafana
+        client_name: Grafana
+        client_secret: '{{ env "OIDC_GRAFANA_SECRET_HASH" }}'
+        authorization_policy: one_factor
+        token_endpoint_auth_method: client_secret_post
+        scopes:
+          - openid
+          - profile
+          - email
+          - groups
+        redirect_uris:
+          - 'https://{{ env "GRAFANA_SUBDOMAIN" }}.{{ env "DOMAIN" }}/login/generic_oauth'
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+        pkce_challenge_method: S256
+        userinfo_signed_response_alg: none
+      - client_id: immich
+        client_name: Immich
+        client_secret: '{{ env "OIDC_IMMICH_SECRET_HASH" }}'
+        authorization_policy: one_factor
+        scopes:
+          - openid
+          - profile
+          - email
+        redirect_uris:
+          - 'https://{{ env "IMMICH_SUBDOMAIN" }}.{{ env "DOMAIN" }}/auth/login'
+          - 'https://{{ env "IMMICH_SUBDOMAIN" }}.{{ env "DOMAIN" }}/user-settings'
+          - 'app.immich:///oauth-callback'
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+        pkce_challenge_method: S256
+        userinfo_signed_response_alg: RS256
+      - client_id: paperless
+        client_name: Paperless-NGX
+        client_secret: '{{ env "OIDC_PAPERLESS_SECRET_HASH" }}'
+        authorization_policy: one_factor
+        scopes:
+          - openid
+          - profile
+          - email
+        redirect_uris:
+          - 'https://paperless.{{ env "DOMAIN" }}/accounts/oidc/authelia/login/callback/'
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+        pkce_challenge_method: S256
+        userinfo_signed_response_alg: none
+      - client_id: forgejo
+        client_name: Forgejo
+        client_secret: '{{ env "OIDC_FORGEJO_SECRET_HASH" }}'
+        authorization_policy: one_factor
+        token_endpoint_auth_method: client_secret_post
+        scopes:
+          - openid
+          - profile
+          - email
+          - groups
+        redirect_uris:
+          - 'https://{{ env "FORGEJO_SUBDOMAIN" }}.{{ env "DOMAIN" }}/user/oauth2/Authelia/callback'
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+        pkce_challenge_method: S256
+        userinfo_signed_response_alg: none
+session:
+  # secret kommt aus dem Env AUTHELIA_SESSION_SECRET
+  cookies:
+    - name: 'authelia_session'
+      domain: '{{ env "DOMAIN" }}'
+      authelia_url: 'https://{{ env "AUTH_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+      expiration: '1 hour'
+      inactivity: '15 minutes'
+      default_redirection_url: 'https://{{env "HOMEPAGE_SUBDOMAIN"}}.{{ env "DOMAIN" }}'
+{{- if env "TOR_DOMAIN" }}
+    - name: 'authelia_session'
+      domain: '{{ env "TOR_DOMAIN" }}'
+      authelia_url: 'https://{{ env "AUTH_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+      expiration: '1 hour'
+      inactivity: '15 minutes'
+      default_redirection_url: 'https://{{ env "HOMEPAGE_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
+{{- end }}
+ntp:
+  disable_startup_check: true
+  disable_failure: true

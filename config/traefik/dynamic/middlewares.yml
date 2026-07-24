@@ -1,0 +1,174 @@
+# Traefik Middlewares
+http:
+  middlewares:
+    security-headers:
+      headers:
+        # HSTS – Browser erzwingen HTTPS für 2 Jahre, inkl. Subdomains
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        # Frame-Protection
+        frameDeny: true
+        customFrameOptionsValue: "SAMEORIGIN" # Überschreibt frameDeny für Iframes innerhalb der eigenen Domain
+        # Content-Type Sniffing verhindern
+        contentTypeNosniff: true
+        # XSS-Protection (für alte Browser)
+        browserXssFilter: true
+        # Referrer-Policy
+        referrerPolicy: "strict-origin-when-cross-origin"
+        # Permissions-Policy
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        # Eigene Sicherheits-Headers
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow, noarchive"
+          Server: "" # Server-Banner verstecken
+          X-Powered-By: "" # Tech-Stack verstecken
+          Cross-Origin-Opener-Policy: "same-origin"
+          Cross-Origin-Embedder-Policy: "require-corp"
+          Cross-Origin-Resource-Policy: "same-site"
+          X-XSS-Protection: "1; mode=block"
+        # Entferne sensible Request-Header
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          X-Real-IP: ""
+    csp-self:
+      headers:
+        contentSecurityPolicy: >-
+          default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' wss: https:; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;
+    # Compress – GZIP/Brotli für alle Responses
+    compress:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream" # Server-Sent Events nicht komprimieren
+        minResponseBodyBytes: 1024
+    # Redirect www -> non-www
+    redirect-www:
+      redirectRegex:
+        regex: "^https://www\\.(.*)"
+        replacement: "https://${1}"
+        permanent: true
+    # ForwardAuth mit Authelia
+    # Schützt Services ohne eigenes OIDC
+    forward-auth:
+      forwardAuth:
+        address: "http://authelia:9091/api/authz/forward-auth"
+        trustForwardHeader: true
+        # Ohne Limit Möglichkeit von DoS/Speicher-Erschöpfung
+        maxResponseBodySize: 65536
+        authResponseHeaders:
+          - "Remote-User"
+          - "Remote-Groups"
+          - "Remote-Name"
+          - "Remote-Email"
+    # strip-remote-user entfernt vom CLIENT gesetzte Auth-Header. Apps vertrauen für den Onion-Zugriff dem
+    # Remote-User-Header daher darf er niemals vom Client kommen
+    strip-remote-user:
+      headers:
+        customRequestHeaders:
+          Remote-User: ""
+          Remote-Groups: ""
+          Remote-Name: ""
+          Remote-Email: ""
+    # OpenCloud bettet Collabora als Cross-Origin-Iframe (office.<domain>) ein.
+    # Mit COEP: require-corp müsste dieser Frame (und alle seine Ressourcen)
+    # einen CORP-Header liefern. Dadurch können externe Ressourcen oft nicht richtig geladen werden, die hier benötigt werden. 
+    opencloud-headers:
+      headers:
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        frameDeny: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow, noarchive"
+          Server: ""
+          X-Powered-By: ""
+          Cross-Origin-Opener-Policy: "same-origin"
+          Cross-Origin-Resource-Policy: "same-site"
+          X-XSS-Protection: "1; mode=block"
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          X-Real-IP: ""
+    # Tor-Variante von opencloud-headers – ohne HSTS (analog tor-headers).
+    tor-opencloud-headers:
+      headers:
+        frameDeny: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        customResponseHeaders:
+          Strict-Transport-Security: ""
+          X-Robots-Tag: "noindex, nofollow, noarchive"
+          Server: ""
+          X-Powered-By: ""
+          Cross-Origin-Opener-Policy: "same-origin"
+          Cross-Origin-Resource-Policy: "same-site"
+          X-XSS-Protection: "1; mode=block"
+        customRequestHeaders:
+          X-Real-IP: ""
+    # Middleware-Ketten (kombinierte Middlewares)
+    # Standard-Kette für öffentliche Services mit eigener Auth
+    default-chain:
+      chain:
+        middlewares:
+          - security-headers
+          - compress
+    # OpenCloud-Kette – wie default-chain, aber ohne COEP (siehe opencloud-headers)
+    opencloud-chain:
+      chain:
+        middlewares:
+          - opencloud-headers
+          - compress
+    tor-opencloud-chain:
+      chain:
+        middlewares:
+          - tor-opencloud-headers
+          - compress
+    # Authelia-Kette – ForwardAuth für Services ohne eigenes OIDC
+    authelia-chain:
+      chain:
+        middlewares:
+          - forward-auth
+          - security-headers
+          - compress
+    # Tor / Onion-Varianten – identisch zu oben, aber OHNE HSTS.
+    tor-headers:
+      headers:
+        # KEIN HSTS (siehe oben)
+        frameDeny: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        customResponseHeaders:
+          Strict-Transport-Security: ""
+          X-Robots-Tag: "noindex, nofollow, noarchive"
+          Server: ""
+          X-Powered-By: ""
+          Cross-Origin-Opener-Policy: "same-origin"
+          Cross-Origin-Embedder-Policy: "require-corp"
+          Cross-Origin-Resource-Policy: "same-site"
+          X-XSS-Protection: "1; mode=block"
+        customRequestHeaders:
+          X-Real-IP: ""
+    tor-chain:
+      chain:
+        middlewares:
+          - tor-headers
+          - compress
+    # Onion-Authelia-Kette
+    tor-authelia-chain:
+      chain:
+        middlewares:
+          - forward-auth
+          - tor-headers
+          - compress

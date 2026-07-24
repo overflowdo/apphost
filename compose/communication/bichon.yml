@@ -1,0 +1,49 @@
+name: apphost
+volumes:
+  bichon_data: {name: apphost_bichon_data}
+services:
+  bichon:
+    image: rustmailer/bichon:1.4.3@sha256:08003f7a53ab404d6b9a28a187fe19891088b6db13d2e7efcf0c0a92b0d9029e
+    container_name: bichon
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+    volumes:
+      - bichon_data:/data
+    environment:
+      TZ: Europe/Berlin
+      BICHON_HTTP_PORT: 8080
+      BICHON_LOG_LEVEL: info
+      BICHON_JSON_LOGS: "true"
+      BICHON_PUBLIC_URL: ${BICHON_SUBDOMAIN}.${DOMAIN}
+      BICHON_ROOT_DIR: /data
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: false
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 512M}
+        reservations: {memory: 128M}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bichon.rule=Host(`${BICHON_SUBDOMAIN:-bichon}.${DOMAIN}`)"
+      - "traefik.http.routers.bichon.entrypoints=websecure"
+      - "traefik.http.services.bichon.loadbalancer.server.port=8080"
+      - "traefik.http.routers.bichon.middlewares=default-chain@file"
+      - "traefik.http.routers.bichon-tor.rule=HostRegexp(`^${BICHON_SUBDOMAIN:-bichon}\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.bichon-tor.entrypoints=tor-http"
+      - "traefik.http.routers.bichon-tor.service=bichon"
+      - "traefik.http.routers.bichon-tor.middlewares=tor-chain@file"
+      - "homepage.group=Kommunikation"
+      - "homepage.name=Bichon"
+      - "homepage.href=https://${BICHON_SUBDOMAIN:-bichon}.${DOMAIN}"
+      - "homepage.icon=mdi-email"

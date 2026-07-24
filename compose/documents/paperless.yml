@@ -1,0 +1,100 @@
+name: apphost
+volumes:
+  paperless_data: {name: apphost_paperless_data}
+  paperless_media: {name: apphost_paperless_media}
+  paperless_consume: {name: apphost_paperless_consume}
+  paperless_export: {name: apphost_paperless_export}
+  paperless_redis: {name: apphost_paperless_redis}
+services:
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15@sha256:6c86cad803970ea782683a8e80e7403444c5bf3cf70de63b4d3c8e87500db92f
+    container_name: paperless
+    restart: unless-stopped
+    runtime: runc
+    depends_on:
+      paperless-redis:
+        condition: service_healthy
+    networks:
+      documents-network:
+        aliases: [paperless]
+      traefik-public: {}
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+      - paperless_consume:/usr/src/paperless/consume
+      - paperless_export:/usr/src/paperless/export
+    env_file:
+      - ../../secrets/oidc-paperless.env
+    environment:
+      PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?}
+      PAPERLESS_URL: https://paperless.${DOMAIN}
+      PAPERLESS_ALLOWED_HOSTS: "*"
+      PAPERLESS_CSRF_TRUSTED_ORIGINS: "https://paperless.${DOMAIN},https://paperless.${TOR_DOMAIN:-tor-disabled.invalid}"
+      PAPERLESS_TRUSTED_PROXIES: traefik
+      # Remote-User-Auth NUR für den Onion-Zugriff: ForwardAuth (tor-authelia-chain)
+      # liefert Remote-User -> Paperless loggt ein. Clearnet entfernt den Header
+      # (strip-remote-user) -> dort gilt OIDC. ACHTUNG: Paperless hat KEINE
+      # IP-Whitelist für diesen Header (siehe Security-Hinweis im Review).
+      PAPERLESS_ENABLE_HTTP_REMOTE_USER: "true"
+      PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME: "HTTP_REMOTE_USER"
+      PAPERLESS_OCR_LANGUAGE: deu+eng
+      PAPERLESS_SESSION_COOKIE_SECURE: "true"
+      PAPERLESS_CSRF_COOKIE_SECURE: "true"
+      PAPERLESS_ENABLE_UPDATE_CHECK: "false"
+      PAPERLESS_TIME_ZONE: Europe/Berlin
+      USERMAP_UID: 1000
+      USERMAP_GID: 1000
+      PAPERLESS_SOCIAL_AUTO_SIGNUP: "true"
+      PAPERLESS_DISABLE_REGULAR_LOGIN: "true"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, CHOWN, DAC_OVERRIDE]
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "4.0", memory: 2G}
+        reservations: {memory: 256M}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.paperless.rule=Host(`paperless.${DOMAIN}`)"
+      - "traefik.http.routers.paperless.entrypoints=websecure"
+      - "traefik.http.services.paperless.loadbalancer.server.port=8000"
+      - "traefik.http.routers.paperless.middlewares=strip-remote-user@file,default-chain@file"
+      - "traefik.http.routers.paperless-tor.rule=HostRegexp(`^paperless\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.paperless-tor.entrypoints=tor-http"
+      - "traefik.http.routers.paperless-tor.service=paperless"
+      - "traefik.http.routers.paperless-tor.middlewares=tor-authelia-chain@file"
+      - "homepage.group=Dokumente"
+      - "homepage.name=Paperless-NGX"
+      - "homepage.icon=paperless-ngx.png"
+      - "homepage.href=https://paperless.${DOMAIN}"
+  paperless-redis:
+    image: valkey/valkey:8-alpine@sha256:cfe71288f087704b06be45e270afa7a2abbf820093d6b11a23762081f5ff321d
+    container_name: paperless-redis
+    restart: unless-stopped
+    runtime: runc
+    networks: [documents-network]
+    volumes:
+      - paperless_redis:/data
+    command: ["valkey-server", "--save", "60", "1", "--loglevel", "warning", "--maxmemory", "128mb"]
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    user: "999:999"
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 128M}
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=false"

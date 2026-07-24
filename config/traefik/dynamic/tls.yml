@@ -1,0 +1,31 @@
+# Traefik – TLS-Konfiguration BSI TR-02102-2 konform
+tls:
+  options:
+    # Intermediate – TLS 1.2 + TLS 1.3 (BSI TR-02102-2 konform)
+    # Für maximale Kompatibilität (support für ältere Clients wenn nötig aktivierbar)
+    intermediate:
+      minVersion: "VersionTLS12"
+      maxVersion: "VersionTLS13"
+      sniStrict: true
+      cipherSuites:
+        # TLS 1.3 Ciphers (automatisch, keine explizite Konfiguration nötig)
+        # TLS 1.2 Ciphers (BSI TR-02102-2 Empfehlung):
+        - "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+      curvePreferences:
+        - "X25519"
+        - "CurveP256"
+        - "CurveP384"
+    strict:
+      minVersion: "VersionTLS13"
+      sniStrict: true
+    default:
+      minVersion: "VersionTLS13"
+      sniStrict: false
+  # Default Store
+  stores:
+    default: {}

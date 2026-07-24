@@ -1,0 +1,43 @@
+name: apphost
+services:
+  openspeedtest:
+    image: openspeedtest/latest:v2.0.6@sha256:a6a7e3b3e9e93cfe7b9b2eb49c60b2a93644149a0a600845d4df57148b193ff6
+    container_name: openspeedtest
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+    environment:
+      TZ: Europe/Berlin
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /var/log/nginx:size=64m,mode=0777
+      - /var/cache/nginx:size=128m,mode=0777
+      - /run:size=32m,mode=0755
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 128M}
+        reservations: {memory: 32M}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.speedtest.rule=Host(`${OPENSPEEDTEST_SUBDOMAIN:-speedtest}.${DOMAIN}`)"
+      - "traefik.http.routers.speedtest.entrypoints=websecure"
+      - "traefik.http.services.speedtest.loadbalancer.server.port=3000"
+      - "traefik.http.routers.speedtest.middlewares=authelia-chain@file"
+      - "traefik.http.routers.speedtest-tor.rule=HostRegexp(`^${OPENSPEEDTEST_SUBDOMAIN:-speedtest}\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.speedtest-tor.entrypoints=tor-http"
+      - "traefik.http.routers.speedtest-tor.service=speedtest"
+      - "traefik.http.routers.speedtest-tor.middlewares=tor-authelia-chain@file"
+      - "homepage.group=Tools"
+      - "homepage.name=SpeedTest"
+      - "homepage.icon=openspeedtest.png"
+      - "homepage.href=https://${OPENSPEEDTEST_SUBDOMAIN:-speedtest}.${DOMAIN}"

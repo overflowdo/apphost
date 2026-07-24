@@ -1,0 +1,55 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Berlin",
+  "labels": ["dependencies", "renovate"],
+  "assignees": [],
+  "reviewers": [],
+
+  "ignorePaths": [
+    "apphost/.env",
+    "apphost/scripts/**",
+    "apphost/secrets/**",
+    "KI-Evaluaion/**"
+  ],
+
+  "docker-compose": {
+    "managerFilePatterns": [
+      "/(^|/)(?:docker-)?compose[^/]*\\.ya?ml$/",
+      "/(^|/)apphost/compose/.+\\.ya?ml$/"
+    ]
+  },
+
+  "packageRules": [
+    {
+      "description": "Major Updates manuell bestätigen",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-update"],
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "Traefik früher aber dennoch vorsichtig updaten (Internet-facing)",
+      "matchManagers": ["docker-compose"],
+      "matchPackageNames": ["traefik"],
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Unpinned Container-Images sofort automatisch auf Digest pinnen, alle in einem MR",
+      "matchUpdateTypes": ["pinDigest"],
+      "groupName": "Pin unpinned container image digests",
+      "groupSlug": "pin-container-digests",
+      "automerge": true,
+      "automergeType": "branch",
+      "platformAutomerge": true,
+      "prCreation": "immediate",
+      "schedule": ["at any time"]
+    }
+  ]
+}

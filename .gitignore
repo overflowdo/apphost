@@ -1,0 +1,48 @@
+# Umgebungsvariablen (NIEMALS committen!)
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*^
+.Spotlight-V8
+.Trashes
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Generierte Secrets (Authelia, Ntfy, Vaultwarden-Token etc.) – niemals committen
+secrets/
+
+# Tor Hidden Service Keys
+config/tor/hidden_service/
+
+# Zertifikate und Schlüssel
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+# Ausnahme: öffentliche CA-Zertifikate (wenn nötig)
+# !config/<dienst>/certs/ca.pem
+
+# Temporäre Dateien
+tmp/
+temp/
+*.tmp
+
+# Backup-Dateien
+*.bak
+*.backup
+
+# NixOS maschinenspezifische Dateien (von install.sh pro Installation generiert)
+hardware-configuration.nix
+nixos/ssh-key.nix
+nixos/disk-encryption.nix

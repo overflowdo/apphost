@@ -1,0 +1,52 @@
+name: apphost
+services:
+  collabora:
+    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    container_name: collabora
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+    environment:
+      domain: "${OPENCLOUD_SUBDOMAIN:-cloud}\\.${DOMAIN}"
+      aliasgroup1: "https://${WOPISERVER_SUBDOMAIN:-wopi}.${DOMAIN}:443"
+      aliasgroup2: "https://${WOPISERVER_SUBDOMAIN:-wopi}.${TOR_DOMAIN}:443"
+      extra_params: |
+        --o:ssl.enable=false \
+        --o:ssl.ssl_verification=true \
+        --o:ssl.termination=true \
+        --o:welcome.enable=false \
+        --o:net.frame_ancestors=https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN} \
+        --o:net.lok_allow.host[14]=https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN} \
+        --o:home_mode.enable=false
+      DONT_GEN_SSL_CERT: "YES"
+      username: ${COLLABORA_ADMIN_USER:-admin}
+      password: ${COLLABORA_ADMIN_PASSWORD:?}
+    volumes:
+      - /run/current-system/sw/share/X11/fonts/:/usr/share/fonts/truetype/more:ro
+    cap_add: [SYS_ADMIN]
+    security_opt:
+      - seccomp=unconfined
+      - apparmor:unconfined
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+      - /run:size=64m,mode=0755
+    deploy:
+      resources:
+        limits: {cpus: "4.0", memory: 2G}
+        reservations: {memory: 512M}
+    ulimits:
+      nofile: {soft: 65536, hard: 65536}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9980/hosting/discovery"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    entrypoint: ['/bin/bash', '-c']
+    command: ['coolconfig generate-proof-key && /start-collabora-online.sh']
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.collabora.rule=Host(`${COLLABORA_SUBDOMAIN:-office}.${DOMAIN}`)"
+      - "traefik.http.routers.collabora.entrypoints=websecure"
+      - "traefik.http.services.collabora.loadbalancer.server.port=9980"

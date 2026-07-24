@@ -1,0 +1,65 @@
+# AppHost – Haupt-Einstiegspunkt
+name: apphost
+
+networks:
+  traefik-public:
+    name: traefik-public
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
+  socket-proxy:
+    name: socket-proxy
+    driver: bridge
+  monitoring-network:
+    name: monitoring-network
+    driver: bridge
+  communication-network:
+    name: communication-network
+    driver: bridge
+  storage-network:
+    name: storage-network
+    driver: bridge
+  media-network:
+    name: media-network
+    driver: bridge
+  cloud-network:
+    name: cloud-network
+    driver: bridge
+  documents-network:
+    name: documents-network
+    driver: bridge
+  dev-network:
+    name: dev-network
+    driver: bridge
+
+include:
+  # Infrastructure
+  - compose/infrastructure/traefik.yml
+  - compose/infrastructure/authelia.yml
+  - compose/infrastructure/garage.yml
+  - compose/infrastructure/tor.yml
+  # Media
+  - compose/media/jellyfin.yml
+  - compose/media/immich.yml
+  # Documents
+  - compose/documents/paperless.yml
+  - compose/documents/bento-pdf.yml
+  # Cloud
+  - compose/cloud/opencloud.yml
+  - compose/cloud/collabora.yml
+  # Monitoring
+  - compose/monitoring/prometheus.yml
+  - compose/monitoring/grafana.yml
+  - compose/monitoring/loki.yml
+  - compose/monitoring/alertmanager.yml
+  - compose/monitoring/exporters.yml
+  # Communication
+  - compose/communication/ntfy.yml
+  - compose/communication/bichon.yml
+  # Dev
+  - compose/dev/forgejo.yml
+  # Tools
+  - compose/tools/homepage.yml
+  - compose/tools/openspeedtest.yml
+  - compose/tools/vaultwarden.yml

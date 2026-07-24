@@ -1,0 +1,70 @@
+name: apphost
+volumes:
+  authelia_data: {name: apphost_authelia_data}
+services:
+  authelia:
+    image: authelia/authelia:4.38.18@sha256:a5e6fa4b1dbdc296f80f9175157b145a0598690ec8cd4d6e105cd4498fe0c731
+    container_name: authelia
+    restart: unless-stopped
+    runtime: runc
+    # Authelias eigenes Entrypoint chownt nur /config, nicht /data.
+    # Auf einem frischen (root:root) Volume kann der auf PUID/PGID
+    # gedroppte Prozess sonst weder db.sqlite3 noch notification.txt anlegen.
+    # Deshalb /data selbst chownen und dann an das Original-Entrypoint übergeben.
+    entrypoint: ["/bin/sh", "-c", "chown -R $${PUID:-1000}:$${PGID:-1000} /data && exec /app/entrypoint.sh"]
+    networks:
+      traefik-public: {}
+    volumes:
+      - authelia_data:/data
+      - ../../config/authelia/configuration.yml:/config/configuration.yml:ro
+      - ../../secrets/authelia_users.yml:/config/users_database.yml
+      - ../../secrets/authelia_oidc_jwks.pem:/config/oidc_jwks.pem:ro
+    env_file:
+      - ../../secrets/authelia.env
+    environment:
+      TZ: Europe/Berlin
+      PUID: "1000"
+      PGID: "1000"
+      X_AUTHELIA_CONFIG_FILTERS: template
+      # Für Template-Auflösung in configuration.yml.
+      # Nur X_AUTHELIA_* und nicht-AUTHELIA_*-Variablen: alles mit AUTHELIA_-Präfix
+      # versucht Authelia auf einen Config-Key zu mappen ("not expected"-Warnung).
+      DOMAIN: ${DOMAIN}
+      TOR_DOMAIN: ${TOR_DOMAIN:-}
+      AUTH_SUBDOMAIN: ${AUTHELIA_SUBDOMAIN:-auth}
+      GRAFANA_SUBDOMAIN: ${GRAFANA_SUBDOMAIN:-grafana}
+      IMMICH_SUBDOMAIN: ${IMMICH_SUBDOMAIN:-photos}
+      HOMEPAGE_SUBDOMAIN: ${HOMEPAGE_SUBDOMAIN:-dashboard}
+      OPENSPEEDTEST_SUBDOMAIN: ${OPENSPEEDTEST_SUBDOMAIN:-speedtest}
+      BICHON_SUBDOMAIN: ${BICHON_SUBDOMAIN:-bichon}
+      FORGEJO_SUBDOMAIN: ${FORGEJO_SUBDOMAIN:-git}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 256M}
+        reservations: {memory: 64M}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9091/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authelia.rule=Host(`${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}`)"
+      - "traefik.http.routers.authelia.entrypoints=websecure"
+      - "traefik.http.services.authelia.loadbalancer.server.port=9091"
+      - "traefik.http.routers.authelia.middlewares=security-headers@file,compress@file"
+      - "traefik.http.routers.authelia-tor.rule=HostRegexp(`^${AUTHELIA_SUBDOMAIN:-auth}\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.authelia-tor.entrypoints=tor-http"
+      - "traefik.http.routers.authelia-tor.service=authelia"
+      - "traefik.http.routers.authelia-tor.middlewares=tor-headers@file,compress@file"
+      - "homepage.group=Infrastruktur"
+      - "homepage.name=Authelia"
+      - "homepage.icon=authelia.png"
+      - "homepage.href=https://${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}"

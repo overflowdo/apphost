@@ -1,0 +1,11 @@
+# =============================================================================
+# Homepage – Globale Einstellungen
+# =============================================================================
+title: AppHost
+description: Privates Homelab-Dashboard
+language: de
+theme: dark
+color: slate
+headerStyle: clean
+statusStyle: "dot"
+hideVersion: true

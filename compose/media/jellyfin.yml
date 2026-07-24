@@ -1,0 +1,53 @@
+name: apphost
+volumes:
+  jellyfin_config: {name: apphost_jellyfin_config}
+  jellyfin_cache: {name: apphost_jellyfin_cache}
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:10.11.10@sha256:f66273e014b307e4ac46778845ebc1e9ee24b2e57c1fc17d5ec5ac3015649bfa
+    container_name: jellyfin
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+    volumes:
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      - ${MEDIA_DIR:-/mnt/media}:/media:ro
+      # Hardware-Transcoding
+      # - /dev/dri:/dev/dri
+    environment:
+      JELLYFIN_PublishedServerUrl: https://jellyfin.${DOMAIN}
+      TZ: Europe/Berlin
+    user: "1000:1000"
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+      - /transcode:size=4g,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "4.0", memory: 4G}
+        reservations: {cpus: "0.25", memory: 512M}
+    ulimits:
+      nofile: {soft: 65536, hard: 65536}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8096/health || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`)"
+      - "traefik.http.routers.jellyfin.entrypoints=websecure"
+      - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+      - "traefik.http.routers.jellyfin.middlewares=default-chain@file"
+      - "traefik.http.routers.jellyfin-tor.rule=HostRegexp(`^jellyfin\\.[a-z2-7]{16,56}\\.onion`)"
+      - "traefik.http.routers.jellyfin-tor.entrypoints=tor-http"
+      - "traefik.http.routers.jellyfin-tor.service=jellyfin"
+      - "traefik.http.routers.jellyfin-tor.middlewares=tor-chain@file"
+      - "homepage.group=Media"
+      - "homepage.name=Jellyfin"
+      - "homepage.icon=jellyfin.png"
+      - "homepage.href=https://jellyfin.${DOMAIN}"

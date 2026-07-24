@@ -1,0 +1,8 @@
+- datetime:
+    text_size: xl
+    format:
+      timeStyle: short
+      hourCycle: h23
+- greeting:
+    text_size: xl
+    text: Hallo User!
