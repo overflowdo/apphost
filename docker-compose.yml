@@ -38,7 +38,6 @@ include:
   - compose/infrastructure/traefik.yml
   - compose/infrastructure/authelia.yml
   - compose/infrastructure/garage.yml
-  - compose/infrastructure/tor.yml
   # Media
   - compose/media/jellyfin.yml
   - compose/media/immich.yml

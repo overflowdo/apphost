@@ -10,7 +10,6 @@ services:
     environment:
       domain: "${OPENCLOUD_SUBDOMAIN:-cloud}\\.${DOMAIN}"
       aliasgroup1: "https://${WOPISERVER_SUBDOMAIN:-wopi}.${DOMAIN}:443"
-      aliasgroup2: "https://${WOPISERVER_SUBDOMAIN:-wopi}.${TOR_DOMAIN}:443"
       extra_params: |
         --o:ssl.enable=false \
         --o:ssl.ssl_verification=true \

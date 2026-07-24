@@ -404,9 +404,7 @@ echo -e "  ${B}Nach dem Neustart:${N}"
 echo ""
 echo -e "  ${B}1.${N} SSH-Login:     ssh apphost@<IP-ADRESSE>"
 echo -e "  ${B}2.${N} Stack starten: cd /opt/monorepo && docker compose up -d"
-echo -e "  ${B}3.${N} Tor-Adresse:   bash /opt/monorepo/scripts/show-onion-address.sh"
-echo -e "            TOR_DOMAIN in .env eintragen, danach: docker compose up -d"
-echo -e "  ${B}4.${N} Vaultwarden Admin-Token: cat /opt/monorepo/secrets/vaultwarden_admin_token.txt"
+echo -e "  ${B}3.${N} Vaultwarden Admin-Token: cat /opt/monorepo/secrets/vaultwarden_admin_token.txt"
 echo ""
 
 for i in 5 4 3 2 1; do
