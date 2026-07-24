@@ -387,6 +387,14 @@ for script in update-secrets-authelia update-secrets-ntfy; do
     fi
 done
 
+# Ownership final korrigieren: .env und die frisch generierten Secrets wurden
+# nach dem ersten chown (weiter oben) als root angelegt und wären damit für den
+# apphost-Nutzer nicht lesbar – "docker compose" läuft aber als apphost. Daher
+# hier erneut rekursiv setzen (Modes wie 600/700 bleiben, nur der Owner stimmt).
+# Namen "apphost"/"docker" lösen nur im Zielsystem auf -> via nixos-enter.
+info "Setze Besitzrechte für /opt/monorepo (apphost:docker)..."
+nixos-enter --root /mnt -- chown -R apphost:docker /opt/monorepo
+
 cd "$REPO_DIR"
 
 echo ""
