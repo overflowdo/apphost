@@ -1,0 +1,262 @@
+From ce1a4b816519e20e575e0e0d029037f4efe03888 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 24 Jul 2026 22:51:10 +0000
+Subject: [PATCH 1/2] install.sh: fix ownership of .env and secrets (chown
+ after generation)
+
+Der rekursive chown auf apphost:docker lief bisher VOR dem Erzeugen von
+.env und den Secrets. Diese wurden danach als root (mode 600/700) angelegt
+und waren damit fuer den apphost-Nutzer nicht lesbar -> "docker compose"
+(laeuft als apphost) scheiterte mit "open .env: permission denied".
+
+Fix: nach der Secret-Erzeugung erneut rekursiv chownen. Modes bleiben, nur
+der Owner wird korrigiert; via nixos-enter, da apphost/docker nur im
+Zielsystem aufloesen.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013ue4wftjmfNY6iFN9zR3JA
+---
+ nixos/install.sh | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/nixos/install.sh b/nixos/install.sh
+index b10284c..2de53b7 100644
+--- a/nixos/install.sh
++++ b/nixos/install.sh
+@@ -387,6 +387,14 @@ for script in update-secrets-authelia update-secrets-ntfy; do
+     fi
+ done
+ 
++# Ownership final korrigieren: .env und die frisch generierten Secrets wurden
++# nach dem ersten chown (weiter oben) als root angelegt und wären damit für den
++# apphost-Nutzer nicht lesbar – "docker compose" läuft aber als apphost. Daher
++# hier erneut rekursiv setzen (Modes wie 600/700 bleiben, nur der Owner stimmt).
++# Namen "apphost"/"docker" lösen nur im Zielsystem auf -> via nixos-enter.
++info "Setze Besitzrechte für /opt/monorepo (apphost:docker)..."
++nixos-enter --root /mnt -- chown -R apphost:docker /opt/monorepo
++
+ cd "$REPO_DIR"
+ 
+ echo ""
+-- 
+2.43.0
+
+
+From 8becc62d9d284600727c5668995f570599a12e7e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 24 Jul 2026 23:01:12 +0000
+Subject: [PATCH 2/2] Remove Tor onion service (local-only deployment, no
+ outbound)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Der Tor-Dienst baut ausgehende Verbindungen ins Tor-Netz auf, um den
+Onion-Service zu veroeffentlichen – fuer einen rein lokalen Betrieb
+unerwuenscht. Entfernt:
+
+- compose/infrastructure/tor.yml + Include aus docker-compose.yml
+- config/tor/torrc, scripts/show-onion-address.sh
+- TOR_DOMAIN aus .env.example, Tor-Hinweis aus install.sh
+- collabora.yml: aliasgroup2 mit ${TOR_DOMAIN} entfernt (waere mit leerem
+  TOR_DOMAIN zu "https://wopi.:443" kaputtgegangen)
+- paperless.yml: Tor-Origin aus PAPERLESS_CSRF_TRUSTED_ORIGINS entfernt
+
+Belassen (inert, keine Traefik-Fehler, kein Outbound ohne Container):
+die *-tor-Router (HostRegexp .onion), der tor-http-Entrypoint, die
+Tor-Middlewares und die per {{ if env "TOR_DOMAIN" }} bedingten
+Authelia-Bloecke. Bei leerem/ungesetztem TOR_DOMAIN greifen sie nie.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013ue4wftjmfNY6iFN9zR3JA
+---
+ .env.example                    |  6 -----
+ compose/cloud/collabora.yml     |  1 -
+ compose/documents/paperless.yml |  2 +-
+ compose/infrastructure/tor.yml  | 43 ---------------------------------
+ config/tor/torrc                | 26 --------------------
+ docker-compose.yml              |  1 -
+ nixos/install.sh                |  4 +--
+ scripts/show-onion-address.sh   | 21 ----------------
+ 8 files changed, 2 insertions(+), 102 deletions(-)
+ delete mode 100644 compose/infrastructure/tor.yml
+ delete mode 100644 config/tor/torrc
+ delete mode 100644 scripts/show-onion-address.sh
+
+diff --git a/.env.example b/.env.example
+index ff4f048..9c26036 100644
+--- a/.env.example
++++ b/.env.example
+@@ -77,9 +77,3 @@ VAULTWARDEN_ADMIN_TOKEN=CHANGE_THIS_VAULTWARDEN_ADMIN_TOKEN
+ 
+ # Prometheus
+ PROMETHEUS_RETENTION=30d
+-
+-# Onion-Adresse des Hidden Service (ohne Schema, ohne Subdomain).
+-# Anzeigen: bash scripts/show-onion-address.sh
+-# WICHTIG: Muss gesetzt sein, damit Authelia/ForwardAuth über Tor funktioniert
+-# (Authelia bekommt hierüber den Onion-Cookie-Bereich + Access-Control-Regeln).
+-TOR_DOMAIN=SET_THIS_TO_YOUR_ONION_DOMAIN.onion
+diff --git a/compose/cloud/collabora.yml b/compose/cloud/collabora.yml
+index 0f055fe..66a39cf 100644
+--- a/compose/cloud/collabora.yml
++++ b/compose/cloud/collabora.yml
+@@ -10,7 +10,6 @@ services:
+     environment:
+       domain: "${OPENCLOUD_SUBDOMAIN:-cloud}\\.${DOMAIN}"
+       aliasgroup1: "https://${WOPISERVER_SUBDOMAIN:-wopi}.${DOMAIN}:443"
+-      aliasgroup2: "https://${WOPISERVER_SUBDOMAIN:-wopi}.${TOR_DOMAIN}:443"
+       extra_params: |
+         --o:ssl.enable=false \
+         --o:ssl.ssl_verification=true \
+diff --git a/compose/documents/paperless.yml b/compose/documents/paperless.yml
+index 399e3bd..9e58a90 100644
+--- a/compose/documents/paperless.yml
++++ b/compose/documents/paperless.yml
+@@ -30,7 +30,7 @@ services:
+       PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?}
+       PAPERLESS_URL: https://paperless.${DOMAIN}
+       PAPERLESS_ALLOWED_HOSTS: "*"
+-      PAPERLESS_CSRF_TRUSTED_ORIGINS: "https://paperless.${DOMAIN},https://paperless.${TOR_DOMAIN:-tor-disabled.invalid}"
++      PAPERLESS_CSRF_TRUSTED_ORIGINS: "https://paperless.${DOMAIN}"
+       PAPERLESS_TRUSTED_PROXIES: traefik
+       # Remote-User-Auth NUR für den Onion-Zugriff: ForwardAuth (tor-authelia-chain)
+       # liefert Remote-User -> Paperless loggt ein. Clearnet entfernt den Header
+diff --git a/compose/infrastructure/tor.yml b/compose/infrastructure/tor.yml
+deleted file mode 100644
+index 8c8324e..0000000
+--- a/compose/infrastructure/tor.yml
++++ /dev/null
+@@ -1,43 +0,0 @@
+-name: apphost
+-volumes:
+-  tor_data:
+-    name: apphost_tor_data
+-services:
+-  tor:
+-    image: osminogin/tor-simple:0.4.9.8@sha256:6eac518e0f9c8779619ed5c974de3b819f538de055fd6c04386f40b142a750f0
+-    container_name: tor
+-    restart: unless-stopped
+-    runtime: runc
+-    networks:
+-      traefik-public: {}
+-    volumes:
+-      - tor_data:/var/lib/tor
+-      - ../../config/tor/torrc:/etc/tor/torrc:ro
+-    environment:
+-      TZ: Europe/Berlin
+-    security_opt:
+-      - no-new-privileges:true
+-    cap_drop:
+-      - ALL
+-    cap_add:
+-      - SETUID
+-      - SETGID
+-    read_only: true
+-    tmpfs:
+-      - /tmp:size=64m,mode=1777
+-      - /run:size=32m,mode=0755
+-    deploy:
+-      resources:
+-        limits:
+-          cpus: "0.5"
+-          memory: 128M
+-        reservations:
+-          memory: 32M
+-    healthcheck:
+-      test: ["CMD-SHELL", "pgrep tor || exit 1"]
+-      interval: 30s
+-      timeout: 10s
+-      retries: 3
+-      start_period: 30s
+-    labels:
+-      - "traefik.enable=false"
+diff --git a/config/tor/torrc b/config/tor/torrc
+deleted file mode 100644
+index 9ca72dd..0000000
+--- a/config/tor/torrc
++++ /dev/null
+@@ -1,26 +0,0 @@
+-# Logging
+-DataDirectory /var/lib/tor
+-Log notice stdout
+-
+-# Kein ausgehender Exit-Node
+-ExitPolicy reject *:*
+-ExitRelay 0
+-
+-# Der Onlion Service leitet eingehende Tor-Verbindungen an Traefik weiter.
+-HiddenServiceDir /var/lib/tor/hidden_service
+-HiddenServiceVersion 3
+-
+-# Port 443 -> Traefik tor-http-Entrypoint (TLS, selbstsigniertes Zertifikat)
+-HiddenServicePort 443 172.23.1.2:8880
+-# Port 80  -> Traefik 'web'-Entrypoint (308-Redirect auf https://…onion)
+-HiddenServicePort 80 172.23.1.2:8081
+-
+-# Relay Deaktivieren
+-SocksPort 0              # Kein SOCKS-Proxy
+-ControlPort 0            # Kein Control-Port benötigt
+-
+-# Netzwerk-Isolation
+-ClientOnly 1             # Nur als Client agieren (kein Relay)
+-
+-NumCPUs 1
+-CircuitBuildTimeout 60
+diff --git a/docker-compose.yml b/docker-compose.yml
+index e21b054..e5fd314 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -38,7 +38,6 @@ include:
+   - compose/infrastructure/traefik.yml
+   - compose/infrastructure/authelia.yml
+   - compose/infrastructure/garage.yml
+-  - compose/infrastructure/tor.yml
+   # Media
+   - compose/media/jellyfin.yml
+   - compose/media/immich.yml
+diff --git a/nixos/install.sh b/nixos/install.sh
+index 2de53b7..dad9359 100644
+--- a/nixos/install.sh
++++ b/nixos/install.sh
+@@ -404,9 +404,7 @@ echo -e "  ${B}Nach dem Neustart:${N}"
+ echo ""
+ echo -e "  ${B}1.${N} SSH-Login:     ssh apphost@<IP-ADRESSE>"
+ echo -e "  ${B}2.${N} Stack starten: cd /opt/monorepo && docker compose up -d"
+-echo -e "  ${B}3.${N} Tor-Adresse:   bash /opt/monorepo/scripts/show-onion-address.sh"
+-echo -e "            TOR_DOMAIN in .env eintragen, danach: docker compose up -d"
+-echo -e "  ${B}4.${N} Vaultwarden Admin-Token: cat /opt/monorepo/secrets/vaultwarden_admin_token.txt"
++echo -e "  ${B}3.${N} Vaultwarden Admin-Token: cat /opt/monorepo/secrets/vaultwarden_admin_token.txt"
+ echo ""
+ 
+ for i in 5 4 3 2 1; do
+diff --git a/scripts/show-onion-address.sh b/scripts/show-onion-address.sh
+deleted file mode 100644
+index 755bc01..0000000
+--- a/scripts/show-onion-address.sh
++++ /dev/null
+@@ -1,21 +0,0 @@
+-#!/usr/bin/env bash
+-# Prints the Tor hidden service .onion address.
+-set -euo pipefail
+-
+-HOSTNAME_FILE=/var/lib/tor/hidden_service/hostname
+-
+-ONION=$(docker exec tor cat "$HOSTNAME_FILE" 2>/dev/null || true)
+-
+-if [[ -z "$ONION" ]]; then
+-    echo "ERROR: Could not read onion address. Is the tor container running?" >&2
+-    echo "       docker compose -f compose/infrastructure/tor.yml up -d" >&2
+-    exit 1
+-fi
+-
+-echo "╔══════════════════════════════════════════════════════════════════════════╗"
+-echo "║  Tor Onion-Adresse (Hidden Service v3)                                   ║"
+-echo "╠══════════════════════════════════════════════════════════════════════════╣"
+-echo "║  https://$ONION  ║"
+-echo "╚══════════════════════════════════════════════════════════════════════════╝"
+-echo
+-echo "Wert für .env: TOR_DOMAIN=$ONION"
+-- 
+2.43.0
+
