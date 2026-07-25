@@ -3,7 +3,7 @@ volumes:
   forgejo_data: {name: apphost_forgejo_data}
 services:
   forgejo:
-    image: codeberg.org/forgejo/forgejo:15.0.2@sha256:db04c7114b656f896e206ba3873fe8d3a7adf2daa44907037f0274f4ba653fb9
+    image: codeberg.org/forgejo/forgejo:15.0.5@sha256:eda2e378442d2f18cfa563994f8ad66e71f04ac9c3bb4259cc57bdd641890f5c
     container_name: forgejo
     restart: unless-stopped
     runtime: runc
@@ -76,7 +76,7 @@ services:
       - "homepage.icon=gitea.png"
       - "homepage.href=https://${FORGEJO_SUBDOMAIN:-git}.${DOMAIN}"
   forgejo-init:
-    image: codeberg.org/forgejo/forgejo:15.0.2@sha256:db04c7114b656f896e206ba3873fe8d3a7adf2daa44907037f0274f4ba653fb9
+    image: codeberg.org/forgejo/forgejo:15.0.5@sha256:eda2e378442d2f18cfa563994f8ad66e71f04ac9c3bb4259cc57bdd641890f5c
     container_name: forgejo-init
     restart: "no"
     runtime: runc
