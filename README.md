@@ -20,13 +20,12 @@ Die vollständige Installations‑ und Betriebsanleitung liegt in **[Installatio
 
 | Kategorie        | Dienste                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
-| Infrastruktur    | Traefik (Reverse Proxy), Authelia (SSO/OIDC), Garage (S3), Tor (Onion) |
+| Infrastruktur    | Traefik (Reverse Proxy), Authelia (SSO/OIDC)                           |
 | Cloud            | OpenCloud, Collabora Online                                            |
 | Medien           | Jellyfin, Immich                                                       |
 | Dokumente        | Paperless‑ngx, BentoPDF                                                |
 | Monitoring       | Prometheus, Grafana, Loki, Alertmanager, node/cAdvisor‑Exporter       |
 | Kommunikation    | ntfy (Push), Bichon (Mail‑Archiv)                                      |
-| Entwicklung      | Forgejo                                                                 |
 | Tools            | Homepage (Dashboard), Vaultwarden, OpenSpeedTest                       |
 
 ## Kurzüberblick Installation
