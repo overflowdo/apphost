@@ -6,6 +6,7 @@
     ./modules/docker.nix
     ./modules/networking.nix
     ./modules/secureboot.nix
+    ./modules/media-disk.nix
   ];
 
   # System
