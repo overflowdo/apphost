@@ -71,7 +71,6 @@ access_control:
         - 'traefik.{{ env "TOR_DOMAIN" }}'
         - '{{ env "OPENSPEEDTEST_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
         - '{{ env "GRAFANA_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
-        - '{{ env "FORGEJO_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
         - 'paperless.{{ env "TOR_DOMAIN" }}'
         - '{{ env "IMMICH_SUBDOMAIN" }}.{{ env "TOR_DOMAIN" }}'
       policy: one_factor
@@ -81,7 +80,6 @@ access_control:
         - '{{ env "GRAFANA_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
         - '{{ env "IMMICH_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
         - 'paperless.{{ env "DOMAIN" }}'
-        - '{{ env "FORGEJO_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
       policy: one_factor
 identity_validation:
   reset_password:
@@ -151,24 +149,6 @@ identity_providers:
           - email
         redirect_uris:
           - 'https://paperless.{{ env "DOMAIN" }}/accounts/oidc/authelia/login/callback/'
-        grant_types:
-          - authorization_code
-        response_types:
-          - code
-        pkce_challenge_method: S256
-        userinfo_signed_response_alg: none
-      - client_id: forgejo
-        client_name: Forgejo
-        client_secret: '{{ env "OIDC_FORGEJO_SECRET_HASH" }}'
-        authorization_policy: one_factor
-        token_endpoint_auth_method: client_secret_post
-        scopes:
-          - openid
-          - profile
-          - email
-          - groups
-        redirect_uris:
-          - 'https://{{ env "FORGEJO_SUBDOMAIN" }}.{{ env "DOMAIN" }}/user/oauth2/Authelia/callback'
         grant_types:
           - authorization_code
         response_types:

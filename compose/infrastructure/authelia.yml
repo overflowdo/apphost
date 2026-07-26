@@ -37,7 +37,6 @@ services:
       HOMEPAGE_SUBDOMAIN: ${HOMEPAGE_SUBDOMAIN:-dashboard}
       OPENSPEEDTEST_SUBDOMAIN: ${OPENSPEEDTEST_SUBDOMAIN:-speedtest}
       BICHON_SUBDOMAIN: ${BICHON_SUBDOMAIN:-bichon}
-      FORGEJO_SUBDOMAIN: ${FORGEJO_SUBDOMAIN:-git}
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]

@@ -29,9 +29,6 @@ networks:
   documents-network:
     name: documents-network
     driver: bridge
-  dev-network:
-    name: dev-network
-    driver: bridge
 
 include:
   # Infrastructure
@@ -56,8 +53,6 @@ include:
   # Communication
   - compose/communication/ntfy.yml
   - compose/communication/bichon.yml
-  # Dev
-  - compose/dev/forgejo.yml
   # Tools
   - compose/tools/homepage.yml
   - compose/tools/openspeedtest.yml
