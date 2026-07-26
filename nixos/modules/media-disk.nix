@@ -4,20 +4,21 @@
 # damit eine Neuinstallation den Mount automatisch enthält und Immich/OpenCloud/
 # Paperless/Jellyfin ihre Bulk-Daten wiederfinden – ohne manuelles Nachtragen.
 #
-# WICHTIG: Die UUID gehört zum btrfs auf der WD-Elements-4TB dieses Hosts. Bei einer
-# Neu-Formatierung der Platte hier die neue UUID eintragen (in der VM: `blkid /dev/sdb`).
+# device = der QEMU-Durchreich-Datenträger an scsi1 (`qm set 100 -scsi1 …`). Dieser
+# by-id-Pfad ist stabil, deterministisch (solange die Platte an scsi1 hängt) und
+# überlebt ein Neuformatieren der Platte (anders als eine btrfs-UUID, die man dann
+# nachziehen müsste). Hängst du die Platte an einen anderen scsi-Slot, hier anpassen.
 #
-# nofail  -> die VM bootet auch durch, wenn die USB-Platte gerade nicht da ist,
-#            statt im Notfall-Modus hängen zu bleiben.
+# nofail  -> die VM bootet auch durch, wenn die USB-Platte gerade nicht da ist.
 # x-systemd.device-timeout -> nicht ewig auf ein fehlendes Gerät warten.
 #
-# Hinweis: Auf einem bereits laufenden System, das den /mnt/media-Mount noch manuell
-# in hardware-configuration.nix stehen hat, muss dieser dortige Eintrag ENTFERNT
-# werden, bevor rebuild läuft – sonst kollidieren zwei Definitionen desselben Mounts.
+# ACHTUNG: Auf einem laufenden System, das den /mnt/media-Mount noch manuell in
+# hardware-configuration.nix stehen hat, muss dieser dortige Eintrag ENTFERNT werden,
+# bevor `nixos-rebuild` läuft – sonst kollidieren zwei Definitionen desselben Mounts.
 { ... }:
 {
   fileSystems."/mnt/media" = {
-    device = "/dev/disk/by-uuid/16c073c4-7251-4e65-9145-8643e053a767";
+    device = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1";
     fsType = "btrfs";
     options = [
       "nofail"
