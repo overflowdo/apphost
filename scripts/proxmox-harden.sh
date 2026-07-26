@@ -67,20 +67,37 @@ else
     ERRORS=$((ERRORS + 1))
 fi
 
-# --- USB deaktivieren ---
+# --- USB haerten (aber Bulk-Datenplatte zulassen) ---
 echo ""
 echo "[ USB ]"
 
+# Dieser Host nutzt eine USB-HDD als Bulk-Storage (Durchreichen in die VM ->
+# /mnt/media). usb-storage darf daher NICHT geblacklistet werden, sonst taucht die
+# Platte nach dem Boot nicht als Blockgeraet auf und der Stack findet seine Daten
+# nicht. uas + usbhid bleiben blockiert (kein UAS, keine fremden USB-Eingabegeraete).
 cat > /etc/modprobe.d/99-disable-usb.conf << 'EOF'
-blacklist usb-storage
+# usb-storage bewusst NICHT geblacklistet: die Bulk-Datenplatte haengt daran.
 blacklist uas
 blacklist usbhid
 EOF
 
+# Quirk fuer die USB-Datenplatte: IGNORE_UAS (0x800000) erzwingt stabiles
+# BOT/usb-storage statt UAS. VID:PID gehoert zur WD-Elements-4TB; bei anderer
+# Platte anpassen ('lsusb' zeigt die IDs) oder USB_HDD_QUIRK vorab setzen.
+USB_HDD_QUIRK="${USB_HDD_QUIRK:-1058:25a3:u}"
+cat > /etc/modprobe.d/wd-uas-quirk.conf << EOF
+options usb-storage quirks=${USB_HDD_QUIRK}
+EOF
+
+# usb-storage beim Boot automatisch laden. (Eine Blacklist wuerde modules-load.d
+# ueberstimmen; da usb-storage jetzt nicht mehr geblacklistet ist, greift das.)
+echo usb-storage > /etc/modules-load.d/usb-storage.conf
+
 echo "Aktualisiere initramfs..."
 update-initramfs -u -k all 2>&1 | grep -E "^update-initramfs|^done" || true
 
-for mod in usbhid usb_storage uas; do
+# Nur uas/usbhid entladen -- usb-storage NICHT (die Datenplatte braucht es).
+for mod in usbhid uas; do
     if lsmod | grep -q "^${mod}\b"; then
         modprobe -r "$mod" 2>/dev/null \
             && echo "Modul $mod entladen." \
@@ -88,7 +105,10 @@ for mod in usbhid usb_storage uas; do
     fi
 done
 
-echo "USB-Blacklist gesetzt (wirkt vollstaendig nach Neustart)."
+# usb-storage sicherstellen (explizites Laden umgeht eine evtl. noch aktive Blacklist).
+modprobe usb-storage 2>/dev/null && echo "usb-storage geladen." || true
+
+echo "USB gehaertet (uas/usbhid blockiert), Bulk-Datenplatte ueber usb-storage erlaubt."
 
 # --- UEFI & Secure Boot ---
 echo ""
