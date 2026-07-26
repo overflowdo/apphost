@@ -6,7 +6,12 @@ tls:
     intermediate:
       minVersion: "VersionTLS12"
       maxVersion: "VersionTLS13"
-      sniStrict: true
+      # sniStrict AUS für den lokalen self-signed Betrieb: ohne ACME-Zertifikat
+      # für ${DOMAIN} muss Traefik bei nicht-passender SNI sein Default-Zertifikat
+      # ausliefern. sniStrict: true würde das blocken -> Browser bekommt ein
+      # TLS-'unrecognized_name'-Alert (Firefox: SSL_ERROR_UNRECOGNIZED_NAME_ALERT).
+      # Für einen öffentlichen Betrieb mit echten Zertifikaten kann das wieder true.
+      sniStrict: false
       cipherSuites:
         # TLS 1.3 Ciphers (automatisch, keine explizite Konfiguration nötig)
         # TLS 1.2 Ciphers (BSI TR-02102-2 Empfehlung):
@@ -22,7 +27,9 @@ tls:
         - "CurveP384"
     strict:
       minVersion: "VersionTLS13"
-      sniStrict: true
+      # sniStrict AUS für self-signed Fallback (Begründung siehe "intermediate").
+      # Der websecure-Entrypoint referenziert diese Optionen (strict@file).
+      sniStrict: false
     default:
       minVersion: "VersionTLS13"
       sniStrict: false
