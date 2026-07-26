@@ -9,7 +9,10 @@
 #
 # Ownership-Logik (userns-remap verschiebt Container-UIDs um die dockremap-Basis):
 #   - immich  : Container läuft als root            -> Host-Owner = Basis+0
-#   - opencloud: Container läuft als root            -> Host-Owner = Basis+0
+#   - opencloud: Container läuft als UID 1000        -> Host-Owner = Basis+1000
+#                (opencloudeu/opencloud-rolling läuft NICHT als root; als Basis+0
+#                 hätte der Prozess bei 0770 keinerlei Zugriff -> NATS/JetStream
+#                 kann seinen Store nicht anlegen und OpenCloud crash-loopt)
 #   - paperless: Entrypoint chownt selbst auf UID 1000 (läuft als root an)
 #                -> Host-Owner = Basis+0 genügt
 #   - jellyfin : liest nur (read-only); befüllt wird von apphost
@@ -37,14 +40,27 @@ if [[ -z "${REMAP_BASE:-}" ]]; then
 fi
 echo "dockremap-Basis: $REMAP_BASE"
 
-# Schreibende Dienste -> Owner = remapped root (Basis).
-for svc in immich opencloud paperless; do
+# Dienste, die im Container als root starten -> Owner = remapped root (Basis).
+#   immich   : Prozess bleibt root
+#   paperless: startet als root, chownt intern selbst auf UID 1000
+for svc in immich paperless; do
     dir="$MEDIA_ROOT/$svc"
     mkdir -p "$dir"
     chown "$REMAP_BASE:$REMAP_BASE" "$dir"
     chmod 0770 "$dir"
     echo "  $dir -> $REMAP_BASE:$REMAP_BASE (0770)"
 done
+
+# OpenCloud läuft als Container-UID 1000 (nicht root) -> Host-UID = Basis+1000.
+# Owner Basis+0 würde dem Prozess bei 0770 jeden Zugriff verweigern, der
+# eingebettete NATS/JetStream könnte seinen Store nicht anlegen ("storage
+# directory is not a directory") und OpenCloud crash-loopt.
+oc_dir="$MEDIA_ROOT/opencloud"
+oc_uid="$((REMAP_BASE + 1000))"
+mkdir -p "$oc_dir"
+chown "$oc_uid:$oc_uid" "$oc_dir"
+chmod 0770 "$oc_dir"
+echo "  $oc_dir -> $oc_uid:$oc_uid (0770)"
 
 # Jellyfin-Mediathek: apphost befüllt sie, Jellyfin liest nur (read-only).
 JELLY="$MEDIA_ROOT/jellyfin"
