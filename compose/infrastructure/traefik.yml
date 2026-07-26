@@ -96,6 +96,8 @@ services:
       # Restliche Konfiguration aus dem Repo (v.a. das dynamische Verzeichnis
       # /etc/traefik/dynamic, auf das der file-Provider zeigt)
       - ../../config/traefik:/etc/traefik:ro
+      # Lokale CA + Server-Zertifikat (von nixos/modules/local-ca.nix erzeugt)
+      - /var/lib/apphost-ca:/certs-local:ro
     environment:
       TZ: Europe/Berlin
       # Hetzner:

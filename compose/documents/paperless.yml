@@ -22,12 +22,15 @@ services:
       - /mnt/media/paperless:/usr/src/paperless/media
       - paperless_consume:/usr/src/paperless/consume
       - paperless_export:/usr/src/paperless/export
+      - /var/lib/apphost-ca/local-ca.crt:/certs/local-ca.crt:ro
     env_file:
       - ../../secrets/oidc-paperless.env
     environment:
       PAPERLESS_REDIS: redis://paperless-redis:6379
       PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?}
       PAPERLESS_URL: https://paperless.${DOMAIN}
+      # OIDC-Login gegen Authelia über die lokale CA vertrauen (Python requests)
+      REQUESTS_CA_BUNDLE: /certs/local-ca.crt
       PAPERLESS_ALLOWED_HOSTS: "*"
       PAPERLESS_CSRF_TRUSTED_ORIGINS: "https://paperless.${DOMAIN}"
       PAPERLESS_TRUSTED_PROXIES: traefik

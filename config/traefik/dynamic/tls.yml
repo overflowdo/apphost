@@ -33,6 +33,14 @@ tls:
     default:
       minVersion: "VersionTLS13"
       sniStrict: false
-  # Default Store
+  # Default Store – von der lokalen CA signiertes Zertifikat.
+  # nixos/modules/local-ca.nix erzeugt es unter /var/lib/apphost-ca; in den
+  # Traefik-Container als /certs-local gemountet (compose/infrastructure/traefik.yml).
   stores:
-    default: {}
+    default:
+      defaultCertificate:
+        certFile: /certs-local/apphost.crt
+        keyFile: /certs-local/apphost.key
+  certificates:
+    - certFile: /certs-local/apphost.crt
+      keyFile: /certs-local/apphost.key

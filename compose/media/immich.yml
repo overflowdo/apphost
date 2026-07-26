@@ -24,6 +24,7 @@ services:
     volumes:
       - /mnt/media/immich:/data
       - /etc/localtime:/etc/localtime:ro
+      - /var/lib/apphost-ca/local-ca.crt:/certs/local-ca.crt:ro
     environment:
       DB_HOSTNAME: immich-postgres
       DB_PORT: 5432
@@ -38,6 +39,8 @@ services:
       LOG_LEVEL: warn
       TZ: Europe/Berlin
       IMMICH_TELEMETRY_INCLUDE: all
+      # OIDC-Login gegen Authelia über die lokale CA vertrauen (Node)
+      NODE_EXTRA_CA_CERTS: /certs/local-ca.crt
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
     tmpfs:

@@ -7,6 +7,7 @@
     ./modules/networking.nix
     ./modules/secureboot.nix
     ./modules/media-disk.nix
+    ./modules/local-ca.nix
   ];
 
   # System
@@ -290,6 +291,10 @@
     up-all = "cd /opt/monorepo && docker compose up -d";
     down   = "cd /opt/monorepo && docker compose down";
     logs = "cd /opt/monorepo && docker compose logs -f";
+
+    # Lokale CA ausgeben (zum Import in Browser/Handy gegen die Zertifikatswarnung).
+    # Vom PC direkt ziehen: scp apphost@<VM-IP>:/var/lib/apphost-ca/local-ca.crt .
+    ca = "cat /var/lib/apphost-ca/local-ca.crt";
 
     # Schnellstatus
     status = "systemctl status --no-pager docker && docker ps";

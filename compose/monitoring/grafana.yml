@@ -17,6 +17,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ../../config/grafana/provisioning:/etc/grafana/provisioning:ro
       - ../../config/grafana/dashboards:/etc/grafana/dashboards:ro
+      - /var/lib/apphost-ca/local-ca.crt:/certs/local-ca.crt:ro
     env_file:
       - ../../secrets/oidc-grafana.env
     environment:
@@ -44,6 +45,8 @@ services:
       GF_AUTH_GENERIC_OAUTH_AUTH_URL: "https://${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}/api/oidc/authorization"
       GF_AUTH_GENERIC_OAUTH_TOKEN_URL: "https://${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}/api/oidc/token"
       GF_AUTH_GENERIC_OAUTH_API_URL: "https://${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}/api/oidc/userinfo"
+      # Backend-Aufrufe (Token/Userinfo) über die lokale CA verifizieren
+      GF_AUTH_GENERIC_OAUTH_TLS_CLIENT_CA: /certs/local-ca.crt
       GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
       GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN: "false"
       GF_AUTH_SIGNOUT_REDIRECT_URL: "https://${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}/logout"
