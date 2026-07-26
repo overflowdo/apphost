@@ -224,8 +224,18 @@ SUBUID_FILE="/etc/subuid"
 REMAP_BASE="$(awk -F: '$1=="dockremap"{print $2}' "$SUBUID_FILE" 2>/dev/null || true)"
 
 if [[ -n "$REMAP_BASE" ]]; then
-    chown "$((REMAP_BASE + 1000)):$((REMAP_BASE + 1000))" "$OUTPUT_ENV" "$OUTPUT_JWKS" "$OUTPUT_USERS"
-    echo "  -> Ownership $((REMAP_BASE + 1000)):$((REMAP_BASE + 1000)) gesetzt (userns-remap-UID für Container-UID 1000)"
+    REMAP_UID="$((REMAP_BASE + 1000))"
+    # oidc_jwks.pem und authelia_users.yml werden IM Authelia-Container gelesen
+    # (userns-remap: Container-UID 1000 = Host REMAP_BASE+1000). Sie müssen der
+    # remapped UID gehören, sonst erscheinen sie im Container als "nobody" ohne
+    # Leserecht und Authelia bricht beim Laden der Config ab.
+    chown "$REMAP_UID:$REMAP_UID" "$OUTPUT_JWKS" "$OUTPUT_USERS"
+    echo "  -> $OUTPUT_JWKS, $OUTPUT_USERS -> $REMAP_UID:$REMAP_UID (userns-remap, im Container gelesen)"
+    # authelia.env dagegen wird per env_file von "docker compose" auf dem HOST
+    # gelesen -> muss dem Deploy-Nutzer gehören (Owner des Repo-Verzeichnisses),
+    # nicht der Container-UID. Sonst kann docker compose die env_file nicht lesen.
+    chown --reference="$ROOT_DIR" "$OUTPUT_ENV"
+    echo "  -> $OUTPUT_ENV an Repo-Owner angeglichen (env_file, host-seitig gelesen)"
 else
     echo "WARNING: dockremap nicht in /etc/subuid gefunden. Ownership nicht gesetzt" >&2
 fi

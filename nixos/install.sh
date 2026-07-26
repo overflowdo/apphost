@@ -395,6 +395,25 @@ done
 info "Setze Besitzrechte für /opt/monorepo (apphost:docker)..."
 nixos-enter --root /mnt -- chown -R apphost:docker /opt/monorepo
 
+# Ausnahme vom rekursiven chown oben: oidc_jwks.pem und authelia_users.yml werden
+# IM Authelia-Container gelesen. Unter userns-remap ist Container-UID 1000 =
+# Host REMAP_BASE+1000; als apphost (Host-UID 1000) gehörend erscheinen sie im
+# Container als "nobody" ohne Leserecht -> Authelia bricht beim Laden der Config
+# ab ("permission denied" auf /config/oidc_jwks.pem). Daher genau diese beiden
+# Bind-Mounts wieder auf die remap-UID setzen. authelia.env NICHT: die liest
+# "docker compose" per env_file auf dem Host (als apphost) und muss apphost gehören.
+REMAP_BASE="$(awk -F: '$1=="dockremap"{print $2}' /mnt/etc/subuid 2>/dev/null | head -1)"
+if [[ -n "$REMAP_BASE" ]]; then
+  AUTHELIA_UID=$((REMAP_BASE + 1000))
+  nixos-enter --root /mnt -- chown "$AUTHELIA_UID:$AUTHELIA_UID" \
+    /opt/monorepo/secrets/authelia_oidc_jwks.pem \
+    /opt/monorepo/secrets/authelia_users.yml
+  info "Authelia-Container-Secrets auf $AUTHELIA_UID:$AUTHELIA_UID gesetzt (userns-remap)"
+else
+  warn "dockremap nicht in /mnt/etc/subuid gefunden – Authelia-Container-Secrets nicht umgesetzt."
+  warn "  Nach Neustart manuell: sudo chown 101000:101000 /opt/monorepo/secrets/authelia_oidc_jwks.pem /opt/monorepo/secrets/authelia_users.yml"
+fi
+
 cd "$REPO_DIR"
 
 echo ""
