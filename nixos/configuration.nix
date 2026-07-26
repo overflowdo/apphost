@@ -283,9 +283,12 @@
     # Nix-Store aufräumen
     gc = "sudo nix-collect-garbage --delete-older-than 30d && sudo nix store optimise";
 
-    # Docker-Stack
-    up   = "cd /opt/monorepo && docker compose up -d";
-    down = "cd /opt/monorepo && docker compose down";
+    # Docker-Stack – "up" startet GESTAFFELT (schwere USB-/RAM-Dienste
+    # nacheinander, mit Health-Wait dazwischen), damit nicht alle gleichzeitig
+    # auf die USB-Platte schreiben + RAM spiken. "up-all" = alles auf einmal.
+    up     = "cd /opt/monorepo && bash scripts/stack-up.sh";
+    up-all = "cd /opt/monorepo && docker compose up -d";
+    down   = "cd /opt/monorepo && docker compose down";
     logs = "cd /opt/monorepo && docker compose logs -f";
 
     # Schnellstatus
