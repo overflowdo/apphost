@@ -79,8 +79,3 @@ scrape_configs:
     static_configs:
       - targets: ["alertmanager:9093"]
     metrics_path: /metrics
-  # Garage S3
-  - job_name: "garage"
-    static_configs:
-      - targets: ["garage:3903"]
-    metrics_path: /metrics

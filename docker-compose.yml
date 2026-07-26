@@ -17,9 +17,6 @@ networks:
   communication-network:
     name: communication-network
     driver: bridge
-  storage-network:
-    name: storage-network
-    driver: bridge
   media-network:
     name: media-network
     driver: bridge
@@ -34,7 +31,6 @@ include:
   # Infrastructure
   - compose/infrastructure/traefik.yml
   - compose/infrastructure/authelia.yml
-  - compose/infrastructure/garage.yml
   # Media
   - compose/media/jellyfin.yml
   - compose/media/immich.yml

@@ -231,7 +231,7 @@ fi
 echo ""
 echo -e "  ${B}Konfiguration${N}"
 echo -e "  Alle Dienst-Passwörter und -Secrets (Immich, Paperless, OpenCloud, Collabora,"
-echo -e "  Garage, Grafana, Vaultwarden, Ntfy) werden automatisch generiert."
+echo -e "  Grafana, Vaultwarden, Ntfy) werden automatisch generiert."
 echo -e "  Alle Werte können nach dem Neustart in /opt/monorepo/.env geändert werden."
 echo ""
 
@@ -301,7 +301,6 @@ ENV_IMMICH_JWT="$(_randhex 32)"
 ENV_PAPERLESS_SECRET="$(_randhex 32)"
 ENV_OPENCLOUD_ADMIN="$(_randhex)"
 ENV_COLLABORA_ADMIN="$(_randhex)"
-ENV_GARAGE_RPC="$(_randhex 32)"
 ENV_GRAFANA_ADMIN="$(_randhex)"
 ENV_GRAFANA_SECRET="$(_randhex 32)"
 
@@ -333,7 +332,6 @@ IMMICH_DB_PASSWORD="$ENV_IMMICH_DB" IMMICH_JWT_SECRET="$ENV_IMMICH_JWT" \
 PAPERLESS_SECRET_KEY="$ENV_PAPERLESS_SECRET" \
 OPENCLOUD_ADMIN_PASSWORD="$ENV_OPENCLOUD_ADMIN" \
 COLLABORA_ADMIN_PASSWORD="$ENV_COLLABORA_ADMIN" \
-GARAGE_RPC_SECRET="$ENV_GARAGE_RPC" \
 GRAFANA_ADMIN_PASSWORD="$ENV_GRAFANA_ADMIN" GRAFANA_SECRET_KEY="$ENV_GRAFANA_SECRET" \
 VAULTWARDEN_ADMIN_TOKEN="$ENV_VAULTWARDEN_TOKEN_HASH" \
 nix run "${NIX_FLAGS[@]}" nixpkgs#python3 -- - "$ENV_FILE" << 'PYEOF'
@@ -347,7 +345,6 @@ keys = [
     'PAPERLESS_SECRET_KEY',
     'OPENCLOUD_ADMIN_PASSWORD',
     'COLLABORA_ADMIN_PASSWORD',
-    'GARAGE_RPC_SECRET',
     'GRAFANA_ADMIN_PASSWORD', 'GRAFANA_SECRET_KEY',
     'VAULTWARDEN_ADMIN_TOKEN',
 ]
