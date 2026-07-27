@@ -1,7 +1,7 @@
 name: apphost
 services:
   bento-pdf:
-    image: ghcr.io/alam00000/bentopdf-simple:2.8.5@sha256:268f3e4a1aeed5d7035b58ab1d679da85b7c559ac3d3c08eb2177520c3647e1f
+    image: ghcr.io/alam00000/bentopdf-simple:2.8.7@sha256:ba67d44f07ec0d2d636c945eef1c186f71bceda3d11b1e9809d7dbfbbaaacfa4
     container_name: bento-pdf
     restart: unless-stopped
     runtime: runc
