@@ -43,6 +43,13 @@
       "ip-forward" = true;
       "userland-proxy" = false;  # Keine Userland-Proxy sondern direktes iptables
 
+      # DNS für Container explizit auf den Pi-hole (.5). Ohne das verwirft Docker
+      # den systemd-resolved-Stub (127.0.0.53) aus /etc/resolv.conf (Loopback ist
+      # im Container nicht erreichbar) und fällt auf 8.8.8.8 zurück -> Container
+      # lösen *.apphost.lan NICHT auf und der OIDC-Token-Call scheitert, obwohl der
+      # Host den Namen kennt. FritzBox (.1) als Fallback, falls der Pi-hole down ist.
+      dns = [ "192.168.178.5" "192.168.178.1" ];
+
       # Sauberes logging mit rotation & compression
       "log-driver" = "json-file";
       "log-opts" = {
