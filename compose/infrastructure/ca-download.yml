@@ -1,0 +1,45 @@
+name: apphost
+services:
+  # Stellt die lokale CA (nur das öffentliche Zertifikat) unter https://ca.<domain>
+  # zum Download bereit – login-frei (default-chain), damit ein neues Gerät die CA
+  # holen kann, BEVOR es sich irgendwo anmeldet. Erzeugt wird die CA von
+  # nixos/modules/local-ca.nix; hier wird nur die .crt read-only eingehängt
+  # (NIEMALS ca.key – der bleibt auf dem Host).
+  ca-download:
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    container_name: ca-download
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+    volumes:
+      - /var/lib/apphost-ca/local-ca.crt:/usr/share/nginx/html/apphost-ca.crt:ro
+      - ../../config/ca-download/index.html:/usr/share/nginx/html/index.html:ro
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+      - /var/cache/nginx:size=8m
+      - /var/run:size=1m
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 64M}
+        reservations: {memory: 16M}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ca-download.rule=Host(`ca.${DOMAIN}`)"
+      - "traefik.http.routers.ca-download.entrypoints=websecure"
+      - "traefik.http.services.ca-download.loadbalancer.server.port=8080"
+      - "traefik.http.routers.ca-download.middlewares=default-chain@file"
+      - "homepage.group=Infrastruktur"
+      - "homepage.name=CA-Zertifikat"
+      - "homepage.icon=mdi-certificate"
+      - "homepage.href=https://ca.${DOMAIN}"
+      - "homepage.description=Lokale CA zum Import"

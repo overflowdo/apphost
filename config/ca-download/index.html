@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AppHost – Lokales CA-Zertifikat</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #0f1115; color: #e6e8ec; padding: 1.5rem; line-height: 1.55;
+    }
+    .card {
+      width: 100%; max-width: 640px; background: #171a21; border: 1px solid #262b36;
+      border-radius: 16px; padding: 2rem 2rem 1.75rem;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+    .sub { color: #9aa4b2; margin: 0 0 1.5rem; font-size: .95rem; }
+    a.dl {
+      display: block; text-align: center; text-decoration: none; font-weight: 600;
+      background: #3b82f6; color: #fff; padding: .9rem 1rem; border-radius: 10px;
+      font-size: 1.05rem; margin-bottom: 1.5rem;
+    }
+    a.dl:hover { background: #2f6fe0; }
+    h2 { font-size: 1rem; margin: 1.25rem 0 .4rem; color: #cbd3df; }
+    ol, ul { margin: .25rem 0 0; padding-left: 1.25rem; }
+    li { margin: .2rem 0; }
+    code { background: #0f1115; border: 1px solid #262b36; border-radius: 6px; padding: .1rem .35rem; font-size: .88em; }
+    .note { margin-top: 1.5rem; padding: .8rem 1rem; background: #1c2330; border-radius: 10px; font-size: .88rem; color: #aeb8c6; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔒 AppHost – Lokales CA-Zertifikat</h1>
+    <p class="sub">Installiere diese Zertifizierungsstelle einmalig auf deinem Gerät, damit alle <code>*.apphost.lan</code>-Seiten ohne Warnung als sicher gelten.</p>
+
+    <a class="dl" href="/apphost-ca.crt" download="apphost-ca.crt">⬇️ CA-Zertifikat herunterladen</a>
+
+    <h2>Windows (Edge / Chrome)</h2>
+    <ol>
+      <li>Datei doppelklicken → <b>Zertifikat installieren</b></li>
+      <li><b>Lokaler Computer</b> → <b>Vertrauenswürdige Stammzertifizierungsstellen</b></li>
+    </ol>
+
+    <h2>Firefox</h2>
+    <ol>
+      <li>Einstellungen → Datenschutz &amp; Sicherheit → Zertifikate anzeigen</li>
+      <li>Reiter <b>Zertifizierungsstellen</b> → <b>Importieren</b> → „Websites vertrauen" ankreuzen</li>
+    </ol>
+
+    <h2>Android</h2>
+    <ol>
+      <li>Einstellungen → Sicherheit → <b>Zertifikat installieren</b> → <b>CA-Zertifikat</b></li>
+    </ol>
+
+    <h2>iPhone / iPad</h2>
+    <ol>
+      <li>Profil laden → Einstellungen → <b>Profil geladen</b> → installieren</li>
+      <li>Einstellungen → Allgemein → Info → <b>Zertifikatsvertrauen</b> → aktivieren</li>
+    </ol>
+
+    <div class="note">
+      Beim allerersten Aufruf dieser Seite warnt der Browser noch (das Gerät kennt die CA ja noch nicht) — einmal „trotzdem fortfahren", herunterladen, installieren. Danach ist überall das grüne Schloss da.
+    </div>
+  </div>
+</body>
+</html>

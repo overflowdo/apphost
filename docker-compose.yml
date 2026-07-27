@@ -31,6 +31,7 @@ include:
   # Infrastructure
   - compose/infrastructure/traefik.yml
   - compose/infrastructure/authelia.yml
+  - compose/infrastructure/ca-download.yml
   # Media
   - compose/media/jellyfin.yml
   - compose/media/immich.yml
