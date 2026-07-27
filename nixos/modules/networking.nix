@@ -3,28 +3,37 @@
   # Netzwerk-Grundkonfiguration
   networking = {
     hostName   = "apphost";
-    domain     = "example.com";  # ÄNDERN
+    domain     = "apphost.lan";
 
-    # DNS mit DoT/DoH für sichere DNS-Auflösung via systemd-resolved
-    nameservers = [
-      "127.0.0.1"
-      "::1"
+    # Statische IP – nötig, damit das Pi-hole-Mapping apphost.lan -> diese VM
+    # dauerhaft stimmt. Pi-hole = .5, App-Host = .6.
+    # ens18 = virtio-NIC der Proxmox-VM (siehe `ip -br link`).
+    useDHCP = false;
+    interfaces.ens18.ipv4.addresses = [
+      { address = "192.168.178.6"; prefixLength = 24; }
     ];
+    defaultGateway = "192.168.178.1";
+
+    # DNS = Pi-hole (.5), damit *.apphost.lan auch VM-/container-seitig auflöst
+    # (der Pi-hole kennt die Wildcard). Ohne das scheitert der OIDC-Token-Call.
+    nameservers = [ "192.168.178.5" ];
 
     # nftables statt iptables (moderner)
     firewall.enable  = false;  # Manuelles nftables-Ruleset unten
   };
 
-  # DNS-over-TLS Konfigration
+  # DNS über den lokalen Pi-hole (Klartext auf :53). DoT/DNSSEC hier bewusst AUS:
+  #  - der Pi-hole spricht plain DNS und macht den verschlüsselten Upstream selbst,
+  #  - die lokale Domain apphost.lan ist unsigniert (DNSSEC würde sie als bogus
+  #    verwerfen und *.apphost.lan gar nicht auflösen).
+  # Fällt der Pi-hole aus, greift der Fallback (FritzBox): Internet läuft weiter,
+  # nur *.apphost.lan nicht.
   services.resolved = {
-    enable       = true;
+    enable      = true;
+    fallbackDns = [ "192.168.178.1" ];
     settings.Resolve = {
-      DNSSEC       = "true";
-      DNSOverTLS   = "true";    # Erzwingt DoT
-      DNS  = [                  # Trusted non logging DoT Server
-        "1.1.1.1#cloudflare-dns.com"
-        "9.9.9.9#dns.quad9.net"
-      ];
+      DNSSEC     = "false";
+      DNSOverTLS = "false";
     };
   };
 
