@@ -30,10 +30,10 @@
   # nur *.apphost.lan nicht.
   services.resolved = {
     enable      = true;
-    fallbackDns = [ "192.168.178.1" ];
     settings.Resolve = {
-      DNSSEC     = "false";
-      DNSOverTLS = "false";
+      DNSSEC      = "false";
+      DNSOverTLS  = "false";
+      FallbackDNS = "192.168.178.1";   # FritzBox, falls Pi-hole down
     };
   };
 
