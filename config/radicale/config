@@ -1,0 +1,20 @@
+# Radicale-Konfiguration. Auth über htpasswd (bcrypt); die Nutzerdatei
+# (/config/users) erzeugt scripts/update-secrets-radicale.sh.
+[server]
+hosts = 0.0.0.0:5232
+# Traefik terminiert TLS; Radicale spricht intern HTTP.
+
+[auth]
+type = htpasswd
+htpasswd_filename = /config/users
+htpasswd_encryption = bcrypt
+
+[storage]
+filesystem_folder = /data/collections
+
+[rights]
+# Jeder Nutzer sieht nur seine eigenen Kalender/Adressbücher.
+type = owner_only
+
+[logging]
+level = warning

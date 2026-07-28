@@ -300,7 +300,7 @@
     status = "systemctl status --no-pager docker && docker ps";
 
     # Secrets neu generieren (nach Passwortänderungen in .env)
-    regen-secrets = "cd /opt/monorepo && bash scripts/update-secrets-authelia.sh && bash scripts/update-secrets-ntfy.sh";
+    regen-secrets = "cd /opt/monorepo && bash scripts/update-secrets-authelia.sh && bash scripts/update-secrets-ntfy.sh && bash scripts/update-secrets-radicale.sh";
   };
 
   # SSH – maximale Härtung

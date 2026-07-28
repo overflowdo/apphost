@@ -1,0 +1,43 @@
+name: apphost
+volumes:
+  radicale_data: {name: apphost_radicale_data}
+services:
+  # CalDAV/CardDAV-Server (Kalender + Kontakte). Sync aufs Handy via DAVx5 ->
+  # erscheint dann in der nativen Samsung-Kalender-App inkl. Widget.
+  # Eigene htpasswd-Basic-Auth (DAVx5 macht kein Browser-SSO), daher NICHT hinter
+  # Authelia. htpasswd wird von scripts/update-secrets-radicale.sh erzeugt.
+  radicale:
+    image: tomsquest/docker-radicale:latest  # von Renovate auf Digest gepinnt
+    container_name: radicale
+    restart: unless-stopped
+    runtime: runc
+    init: true
+    networks:
+      traefik-public: {}
+    volumes:
+      - radicale_data:/data
+      - ../../config/radicale/config:/config/config:ro
+      - ../../secrets/radicale_users:/config/users:ro
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, KILL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+      - /run:size=8m
+    pids_limit: 50
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 128M}
+        reservations: {memory: 32M}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.radicale.rule=Host(`${RADICALE_SUBDOMAIN:-cal}.${DOMAIN}`)"
+      - "traefik.http.routers.radicale.entrypoints=websecure"
+      - "traefik.http.services.radicale.loadbalancer.server.port=5232"
+      - "traefik.http.routers.radicale.middlewares=default-chain@file"
+      - "homepage.group=Tools"
+      - "homepage.name=Kalender (Radicale)"
+      - "homepage.icon=radicale.png"
+      - "homepage.href=https://${RADICALE_SUBDOMAIN:-cal}.${DOMAIN}"
+      - "homepage.description=CalDAV / CardDAV"

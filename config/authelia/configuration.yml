@@ -61,6 +61,7 @@ access_control:
         - '{{ env "OPENSPEEDTEST_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
         - 'pdf.{{ env "DOMAIN" }}'
         - '{{ env "BICHON_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+        - 'grocy.{{ env "DOMAIN" }}'
       policy: one_factor
 {{- if env "TOR_DOMAIN" }}
     - domain:

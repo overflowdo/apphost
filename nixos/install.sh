@@ -375,7 +375,7 @@ info "Vaultwarden Admin-Token gespeichert: /opt/monorepo/secrets/vaultwarden_adm
 info "Generiere Secrets (lädt benötigte Nix-Pakete, dauert einen Moment...)"
 cd "$APP_DIR"
 
-for script in update-secrets-authelia update-secrets-ntfy; do
+for script in update-secrets-authelia update-secrets-ntfy update-secrets-radicale; do
     if bash "scripts/${script}.sh"; then
         info "${script} ✓"
     else

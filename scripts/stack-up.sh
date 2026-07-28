@@ -57,7 +57,7 @@ phase() {
 }
 
 phase "Phase 1  – Reverse Proxy + SSO"        traefik authelia
-phase "Phase 2  – leichte Dienste (SSD)"      homepage ntfy bichon vaultwarden openspeedtest bento-pdf ca-download
+phase "Phase 2  – leichte Dienste (SSD)"      homepage ntfy bichon vaultwarden openspeedtest bento-pdf ca-download radicale grocy
 phase "Phase 3  – Monitoring"                 prometheus grafana loki alertmanager node-exporter cadvisor alloy
 phase "Phase 4  – Immich: DB + Cache"         immich-postgres immich-redis
 phase "Phase 4b – Immich: Server"             immich-server

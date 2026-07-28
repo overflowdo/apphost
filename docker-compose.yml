@@ -54,3 +54,5 @@ include:
   - compose/tools/homepage.yml
   - compose/tools/openspeedtest.yml
   - compose/tools/vaultwarden.yml
+  - compose/tools/radicale.yml
+  - compose/tools/grocy.yml
