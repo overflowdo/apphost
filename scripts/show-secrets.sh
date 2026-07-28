@@ -31,7 +31,11 @@ line "Grocy"             "admin / admin  (beim 1. Login ändern!)"
 line "ntfy (admin)"      "$(env_val NTFY_ADMIN_PASSWORD)"
 echo
 echo "▶ Kalender – Radicale (für DAVx5 am Handy)"
-line "Nutzer"   "$(env_val RADICALE_USER)"
+# Nutzer: bevorzugt aus .env; fehlt RADICALE_USER dort, aus der htpasswd-Datei
+# (Format 'user:$2y$...') lesen; sonst Default 'admin'.
+rad_user="$(env_val RADICALE_USER)"
+[[ -z "$rad_user" && -f secrets/radicale_users ]] && rad_user="$(cut -d: -f1 secrets/radicale_users 2>/dev/null | head -1)"
+line "Nutzer"   "${rad_user:-admin}"
 line "Passwort" "$(file_val secrets/radicale_password.txt)"
 echo
 echo "▶ Vaultwarden – /admin-Token"

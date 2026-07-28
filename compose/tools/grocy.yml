@@ -17,6 +17,11 @@ services:
       traefik-public: {}
     volumes:
       - grocy_config:/config
+      # Feature-Flags declarativ: blendet nicht benötigte Module aus (Rezepte,
+      # Hausarbeiten, Aufgaben, Batterien, Geräte, Kalender). Grocy lädt diese
+      # Datei zuerst, dann config-dist.php für alle übrigen Defaults. read-only,
+      # damit sie die Quelle der Wahrheit im Repo bleibt.
+      - ../../config/grocy/config.php:/config/data/config.php:ro
     environment:
       PUID: "1000"
       PGID: "1000"

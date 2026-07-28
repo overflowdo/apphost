@@ -446,6 +446,30 @@ docker compose up -d
 > [!NOTE]
 > **Passwörter ändern:** Nach Änderungen an Passwörtern in der `.env` müssen die Secrets neu generiert und der Stack neu gestartet werden. Details siehe [Abschnitt 11](#11-passwörter-ändern).
 
+### Kalender (Radicale) & Vorratsverwaltung (Grocy)
+
+**Radicale (CalDAV/CardDAV)** läuft mit eigener Basic-Auth – bewusst **nicht** hinter Authelia, weil DAVx5 kein Browser-SSO macht. Zugangsdaten anzeigen:
+
+```bash
+secrets                             # zeigt Nutzer + Passwort
+cat secrets/radicale_password.txt   # nur das Passwort (für DAVx5)
+```
+
+Standard-Nutzer ist `admin`. Am Handy per **DAVx5** einbinden (Basis-URL `https://cal.${DOMAIN}`, Nutzer `admin`, Passwort s. o.); die Kalender/Kontakte erscheinen dann in der nativen Samsung-Kalender-App (inkl. Widget). Passwort neu setzen: `RADICALE_USER` in `.env`, dann `regen-secrets`.
+
+**Grocy (Vorratsverwaltung)** ist bewusst reduziert auf **Bestand** (inkl. Standorten Kühlschrank/Regal/Keller), **Verbrauchen/Kaufen**, **Einkaufsliste** und **Barcode-Scanner**. Nicht benötigte Module (Rezepte, Speiseplan, Hausarbeiten, Aufgaben, Batterien, Geräte, Kalender) sind **declarativ** über `config/grocy/config.php` abgeschaltet – die Datei wird read-only nach `/config/data/config.php` gemountet und von Grocy als Override vor `config-dist.php` geladen. Module (de)aktivieren = `FEATURE_FLAG_*` dort anpassen, dann:
+
+```bash
+docker compose up -d --force-recreate grocy
+```
+
+Produkte gruppieren (z. B. verschiedene Tomatensoßen) – kein Flag nötig, eingebaut:
+
+- **Produktgruppen** (Stammdaten) – reine Kategorie/Sortierung.
+- **Eltern-/Kind-Produkte** – „egal welche Sorte zählt als ein Bestand" mit kumuliertem Mindestbestand.
+
+Erster Grocy-Login: `admin` / `admin` (danach ändern); der Dienst liegt zusätzlich hinter Authelia-SSO.
+
 ---
 
 ## 9. AIDE initialisieren
