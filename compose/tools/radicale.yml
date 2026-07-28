@@ -10,6 +10,13 @@ services:
     restart: unless-stopped
     runtime: runc
     init: true
+    # /data ist per Bind-Mount schon dem Radicale-UID (2999 -> Host 102999)
+    # übereignet (oneshot apphost-media-dirs). Der Start-chown des Images scheitert
+    # unter userns-remap trotz CAP_CHOWN, weil der Bind-Mount aus dem Host-userns
+    # kommt (EPERM, Crashloop). Er ist dank Vorab-Ownership ohnehin unnötig ->
+    # abschalten. Radicale läuft dann als 2999 und schreibt in sein eigenes /data.
+    environment:
+      - TAKE_FILE_OWNERSHIP=false
     networks:
       traefik-public: {}
     volumes:
