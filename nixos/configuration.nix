@@ -296,6 +296,12 @@
     # Vom PC direkt ziehen: scp apphost@<VM-IP>:/var/lib/apphost-ca/local-ca.crt .
     ca = "cat /var/lib/apphost-ca/local-ca.crt";
 
+    # Alle Passwörter/Tokens (aus .env + secrets/) an einem Ort anzeigen
+    secrets = "cd /opt/monorepo && bash scripts/show-secrets.sh";
+
+    # Übersicht aller Verwaltungsbefehle
+    help = "bash /opt/monorepo/scripts/help.sh";
+
     # Schnellstatus
     status = "systemctl status --no-pager docker && docker ps";
 

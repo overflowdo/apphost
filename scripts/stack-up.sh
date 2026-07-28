@@ -56,6 +56,17 @@ phase() {
     ram
 }
 
+# --- Pre-flight: fehlende Secrets erzeugen (idempotent) ---------------------
+# Dienste, die eine Secret-Datei per Bind-Mount einhängen, brauchen die Datei
+# VOR dem Start – sonst legt Docker dort ein Verzeichnis an und der Container
+# startet kaputt. Die Generatoren sind idempotent (behalten Bestehendes).
+# Muster für künftige secret-basierte Dienste: hier eine Zeile ergänzen.
+if [[ ! -f secrets/radicale_users ]]; then
+    echo "==> Pre-flight: Radicale-Secret fehlt -> erzeuge es"
+    bash scripts/update-secrets-radicale.sh
+    echo
+fi
+
 phase "Phase 1  – Reverse Proxy + SSO"        traefik authelia
 phase "Phase 2  – leichte Dienste (SSD)"      homepage ntfy bichon vaultwarden openspeedtest bento-pdf ca-download radicale grocy
 phase "Phase 3  – Monitoring"                 prometheus grafana loki alertmanager node-exporter cadvisor alloy

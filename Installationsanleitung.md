@@ -488,13 +488,20 @@ Für häufige Verwaltungsaufgaben sind Shell-Aliase definiert, die nach dem Logi
 
 | Alias           | Beschreibung                                                        |
 | --------------- | ------------------------------------------------------------------- |
-| `up`            | Alle Container starten bzw. aktualisieren (`docker compose up -d`)  |
+| `up`            | Stack **gestaffelt** starten: erzeugt fehlende Secrets und fährt die USB-/RAM-schweren Dienste nacheinander hoch (`scripts/stack-up.sh`) |
+| `up-all`        | Alle Container **auf einmal** starten (`docker compose up -d`) – Notnagel |
 | `down`          | Alle Container stoppen                                              |
 | `logs`          | Log-Stream aller Container (`docker compose logs -f`)               |
 | `status`        | Docker-Daemon-Status und laufende Container (`docker ps`)           |
+| `secrets`       | Alle Passwörter/Tokens (aus `.env` + `secrets/`) an einem Ort anzeigen |
 | `regen-secrets` | Alle Secrets neu generieren (nach Passwortänderungen in der `.env`) |
+| `ca`            | Lokales CA-Zertifikat ausgeben (zum Import in Browser/Handy)         |
+| `help`          | Übersicht aller Verwaltungsbefehle                                  |
 
 Nach dem Mergen eines RenovateBot-PRs genügt `up`, um die aktualisierten Images zu ziehen und die Container neu zu starten.
+
+> [!NOTE]
+> `up` ist bewusst gestaffelt (nicht `docker compose up -d`), damit Immich/OpenCloud/Paperless nicht gleichzeitig auf die USB-Platte schreiben und den Host überlasten. Für einen schnellen „alles auf einmal"-Start gibt es `up-all`.
 
 ---
 

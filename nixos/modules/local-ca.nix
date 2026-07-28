@@ -35,18 +35,33 @@ in {
       mkdir -p ${caDir}
       cd ${caDir}
 
-      # 1. CA (Schlüssel + selbstsigniertes Root-Zertifikat, 10 Jahre)
+      # 1. CA (Schlüssel + selbstsigniertes Root-Zertifikat, 10 Jahre).
+      #    basicConstraints CA:TRUE + keyUsage keyCertSign sind PFLICHT, sonst
+      #    lehnen Browser die CA ab (auch wenn Go/Grafana sie via CertPool
+      #    akzeptiert -> "nicht sicher" trotz Import). Explizit via -addext, weil
+      #    der Default je nach openssl.cnf diese Extensions NICHT setzt.
       if [ ! -f ca.key ] || [ ! -f local-ca.crt ]; then
         openssl genrsa -out ca.key 4096
         openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 \
-          -subj "/O=AppHost/CN=AppHost Local CA" -out local-ca.crt
+          -subj "/O=AppHost/CN=AppHost Local CA" \
+          -addext "basicConstraints=critical,CA:TRUE" \
+          -addext "keyUsage=critical,keyCertSign,cRLSign" \
+          -addext "subjectKeyIdentifier=hash" \
+          -out local-ca.crt
       fi
 
       # 2. Server-Zertifikat für ${domain} + *.${domain} (825 Tage, von der CA signiert)
       if [ ! -f apphost.key ] || [ ! -f apphost.crt ]; then
         openssl genrsa -out apphost.key 2048
         openssl req -new -key apphost.key -subj "/CN=${domain}" -out apphost.csr
-        printf 'subjectAltName=DNS:${domain},DNS:*.${domain}\nextendedKeyUsage=serverAuth\n' > san.ext
+        {
+          printf 'basicConstraints=CA:FALSE\n'
+          printf 'keyUsage=critical,digitalSignature,keyEncipherment\n'
+          printf 'extendedKeyUsage=serverAuth\n'
+          printf 'subjectAltName=DNS:${domain},DNS:*.${domain}\n'
+          printf 'subjectKeyIdentifier=hash\n'
+          printf 'authorityKeyIdentifier=keyid,issuer\n'
+        } > san.ext
         openssl x509 -req -in apphost.csr -CA local-ca.crt -CAkey ca.key \
           -CAcreateserial -days 825 -sha256 -extfile san.ext -out apphost.crt
         rm -f apphost.csr san.ext
