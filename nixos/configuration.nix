@@ -7,6 +7,7 @@
     ./modules/networking.nix
     ./modules/secureboot.nix
     ./modules/media-disk.nix
+    ./modules/media-dirs.nix
     ./modules/local-ca.nix
   ];
 
