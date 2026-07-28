@@ -1,6 +1,4 @@
 name: apphost
-volumes:
-  radicale_data: {name: apphost_radicale_data}
 services:
   # CalDAV/CardDAV-Server (Kalender + Kontakte). Sync aufs Handy via DAVx5 ->
   # erscheint dann in der nativen Samsung-Kalender-App inkl. Widget.
@@ -15,7 +13,13 @@ services:
     networks:
       traefik-public: {}
     volumes:
-      - radicale_data:/data
+      # Bind-Mount statt Named Volume: der Container läuft als root (userns-remap
+      # = Host 100000) und macht beim Start `chown -R radicale /data`. Ein frisches
+      # Named Volume gehört Host-root(0) -> im Container "nobody" -> chown scheitert
+      # (EPERM, Crashloop). Über /mnt/media/radicale, vorab per setup-media-dirs.sh
+      # auf Host REMAP_BASE+2999 (Radicale-UID 2999) gesetzt, ist der chown ein
+      # No-op und läuft durch. Gleiches Muster wie OpenCloud.
+      - /mnt/media/radicale:/data
       - ../../config/radicale/config:/config/config:ro
       - ../../secrets/radicale_users:/config/users:ro
     security_opt: ['no-new-privileges:true']
@@ -25,10 +29,9 @@ services:
     tmpfs:
       - /tmp:size=16m,mode=1777
       - /run:size=8m
-    pids_limit: 50
     deploy:
       resources:
-        limits: {cpus: "0.5", memory: 128M}
+        limits: {cpus: "0.5", memory: 128M, pids: 50}
         reservations: {memory: 32M}
     labels:
       - "traefik.enable=true"

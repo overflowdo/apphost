@@ -392,23 +392,25 @@ done
 info "Setze Besitzrechte für /opt/monorepo (apphost:docker)..."
 nixos-enter --root /mnt -- chown -R apphost:docker /opt/monorepo
 
-# Ausnahme vom rekursiven chown oben: oidc_jwks.pem und authelia_users.yml werden
-# IM Authelia-Container gelesen. Unter userns-remap ist Container-UID 1000 =
-# Host REMAP_BASE+1000; als apphost (Host-UID 1000) gehörend erscheinen sie im
+# Ausnahme vom rekursiven chown oben: oidc_jwks.pem (privater Signaturschlüssel)
+# wird IM Authelia-Container gelesen. Unter userns-remap ist Container-UID 1000 =
+# Host REMAP_BASE+1000; als apphost (Host-UID 1000) gehörend erschiene er im
 # Container als "nobody" ohne Leserecht -> Authelia bricht beim Laden der Config
-# ab ("permission denied" auf /config/oidc_jwks.pem). Daher genau diese beiden
-# Bind-Mounts wieder auf die remap-UID setzen. authelia.env NICHT: die liest
+# ab ("permission denied" auf /config/oidc_jwks.pem). Daher jwks auf die remap-UID
+# setzen. authelia_users.yml dagegen bleibt host-owned + world-readable (0644, nur
+# ein Passwort-Hash): so liest der Container es UND `regen-secrets` kann es später
+# als apphost (nicht root) neu schreiben. authelia.env NICHT umsetzen: die liest
 # "docker compose" per env_file auf dem Host (als apphost) und muss apphost gehören.
 REMAP_BASE="$(awk -F: '$1=="dockremap"{print $2}' /mnt/etc/subuid 2>/dev/null | head -1)"
 if [[ -n "$REMAP_BASE" ]]; then
   AUTHELIA_UID=$((REMAP_BASE + 1000))
   nixos-enter --root /mnt -- chown "$AUTHELIA_UID:$AUTHELIA_UID" \
-    /opt/monorepo/secrets/authelia_oidc_jwks.pem \
-    /opt/monorepo/secrets/authelia_users.yml
-  info "Authelia-Container-Secrets auf $AUTHELIA_UID:$AUTHELIA_UID gesetzt (userns-remap)"
+    /opt/monorepo/secrets/authelia_oidc_jwks.pem
+  nixos-enter --root /mnt -- chmod 0644 /opt/monorepo/secrets/authelia_users.yml
+  info "Authelia: jwks -> $AUTHELIA_UID:$AUTHELIA_UID (userns-remap), users.yml -> 0644 host-owned"
 else
-  warn "dockremap nicht in /mnt/etc/subuid gefunden – Authelia-Container-Secrets nicht umgesetzt."
-  warn "  Nach Neustart manuell: sudo chown 101000:101000 /opt/monorepo/secrets/authelia_oidc_jwks.pem /opt/monorepo/secrets/authelia_users.yml"
+  warn "dockremap nicht in /mnt/etc/subuid gefunden – Authelia-Container-Secret nicht umgesetzt."
+  warn "  Nach Neustart manuell: sudo chown 101000:101000 /opt/monorepo/secrets/authelia_oidc_jwks.pem"
 fi
 
 cd "$REPO_DIR"

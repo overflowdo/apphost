@@ -62,6 +62,19 @@ chown "$oc_uid:$oc_uid" "$oc_dir"
 chmod 0770 "$oc_dir"
 echo "  $oc_dir -> $oc_uid:$oc_uid (0770)"
 
+# Radicale (Kalender/Kontakte) läuft im Container als root, der Dienst selbst als
+# UID 2999. Der Container macht beim Start `chown -R radicale /data`; ein frisches
+# Named Volume gehört Host-root(0) und ist im userns "nobody" -> chown scheitert
+# (EPERM, Crashloop). Über diesen vorab auf Basis+2999 gesetzten Bind-Ordner wird
+# der chown ein No-op und läuft durch. (Daten sind winzig; liegen der Konsistenz
+# halber neben den übrigen Diensten auf /mnt/media.)
+rad_dir="$MEDIA_ROOT/radicale"
+rad_uid="$((REMAP_BASE + 2999))"
+mkdir -p "$rad_dir"
+chown "$rad_uid:$rad_uid" "$rad_dir"
+chmod 0770 "$rad_dir"
+echo "  $rad_dir -> $rad_uid:$rad_uid (0770)"
+
 # Jellyfin-Mediathek: apphost befüllt sie, Jellyfin liest nur (read-only).
 JELLY="$MEDIA_ROOT/jellyfin"
 mkdir -p "$JELLY"
