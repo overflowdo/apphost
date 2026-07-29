@@ -1,0 +1,1165 @@
+diff --git a/config/grafana/dashboards/apphost-logs.json b/config/grafana/dashboards/apphost-logs.json
+new file mode 100644
+index 0000000..d7c8b98
+--- /dev/null
++++ b/config/grafana/dashboards/apphost-logs.json
+@@ -0,0 +1,369 @@
++{
++  "uid": "apphost-logs",
++  "title": "AppHost – Logs & Fehler",
++  "tags": [
++    "apphost",
++    "logs"
++  ],
++  "editable": true,
++  "schemaVersion": 39,
++  "version": 1,
++  "refresh": "30s",
++  "time": {
++    "from": "now-6h",
++    "to": "now"
++  },
++  "timezone": "browser",
++  "graphTooltip": 1,
++  "templating": {
++    "list": [
++      {
++        "name": "service",
++        "label": "Service",
++        "type": "query",
++        "datasource": {
++          "type": "loki",
++          "uid": "loki"
++        },
++        "query": {
++          "label": "service",
++          "stream": "",
++          "type": 1
++        },
++        "definition": "label_values(service)",
++        "refresh": 2,
++        "sort": 1,
++        "includeAll": true,
++        "allValue": ".+",
++        "multi": true,
++        "current": {
++          "text": "All",
++          "value": "$__all"
++        }
++      }
++    ]
++  },
++  "annotations": {
++    "list": []
++  },
++  "panels": [
++    {
++      "id": 1,
++      "type": "timeseries",
++      "title": "Fehlerrate je Service (5m)",
++      "datasource": {
++        "type": "loki",
++        "uid": "loki"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 0,
++        "w": 12,
++        "h": 8
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "loki",
++            "uid": "loki"
++          },
++          "expr": "sum by (service) (rate({service=~\".+\"} |~ `(?i)(error|fatal|panic)` [5m]))",
++          "queryType": "range",
++          "legendFormat": "{{service}}"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "short",
++          "custom": {
++            "drawStyle": "line",
++            "lineInterpolation": "smooth",
++            "lineWidth": 1,
++            "fillOpacity": 10,
++            "showPoints": "never",
++            "spanNulls": true,
++            "stacking": {
++              "mode": "none",
++              "group": "A"
++            },
++            "axisPlacement": "auto"
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "legend": {
++          "displayMode": "table",
++          "placement": "bottom",
++          "calcs": [
++            "mean",
++            "max",
++            "lastNotNull"
++          ]
++        },
++        "tooltip": {
++          "mode": "multi",
++          "sort": "desc"
++        }
++      }
++    },
++    {
++      "id": 2,
++      "type": "timeseries",
++      "title": "Log-Volumen je Service (5m)",
++      "datasource": {
++        "type": "loki",
++        "uid": "loki"
++      },
++      "gridPos": {
++        "x": 12,
++        "y": 0,
++        "w": 12,
++        "h": 8
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "loki",
++            "uid": "loki"
++          },
++          "expr": "sum by (service) (rate({service=~\".+\"} [5m]))",
++          "queryType": "range",
++          "legendFormat": "{{service}}"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "short",
++          "custom": {
++            "drawStyle": "line",
++            "lineInterpolation": "smooth",
++            "lineWidth": 1,
++            "fillOpacity": 10,
++            "showPoints": "never",
++            "spanNulls": true,
++            "stacking": {
++              "mode": "normal",
++              "group": "A"
++            },
++            "axisPlacement": "auto"
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "legend": {
++          "displayMode": "table",
++          "placement": "bottom",
++          "calcs": [
++            "mean",
++            "max",
++            "lastNotNull"
++          ]
++        },
++        "tooltip": {
++          "mode": "multi",
++          "sort": "desc"
++        }
++      }
++    },
++    {
++      "id": 3,
++      "type": "stat",
++      "title": "Fehler letzte 1h (gesamt)",
++      "datasource": {
++        "type": "loki",
++        "uid": "loki"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 8,
++        "w": 6,
++        "h": 4
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "loki",
++            "uid": "loki"
++          },
++          "expr": "sum(count_over_time({service=~\".+\"} |~ `(?i)(error|fatal|panic)` [1h]))",
++          "queryType": "range"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "none",
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "green",
++                "value": null
++              },
++              {
++                "color": "yellow",
++                "value": 1
++              },
++              {
++                "color": "red",
++                "value": 50
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "colorMode": "background",
++        "graphMode": "none",
++        "justifyMode": "auto",
++        "textMode": "auto",
++        "orientation": "auto"
++      }
++    },
++    {
++      "id": 4,
++      "type": "stat",
++      "title": "Warnungen letzte 1h",
++      "datasource": {
++        "type": "loki",
++        "uid": "loki"
++      },
++      "gridPos": {
++        "x": 6,
++        "y": 8,
++        "w": 6,
++        "h": 4
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "loki",
++            "uid": "loki"
++          },
++          "expr": "sum(count_over_time({service=~\".+\"} |~ `(?i)(warn)` [1h]))",
++          "queryType": "range"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "none",
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "green",
++                "value": null
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "colorMode": "value",
++        "graphMode": "none",
++        "justifyMode": "auto",
++        "textMode": "auto",
++        "orientation": "auto"
++      }
++    },
++    {
++      "id": 5,
++      "type": "logs",
++      "title": "Live Fehler/Warnungen ($service)",
++      "datasource": {
++        "type": "loki",
++        "uid": "loki"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 12,
++        "w": 24,
++        "h": 12
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "loki",
++            "uid": "loki"
++          },
++          "expr": "{service=~\"$service\"} |~ `(?i)(error|warn|fatal|panic|fail)`",
++          "queryType": "range"
++        }
++      ],
++      "options": {
++        "showTime": true,
++        "showLabels": false,
++        "showCommonLabels": false,
++        "wrapLogMessage": true,
++        "prettifyLogMessage": false,
++        "enableLogDetails": true,
++        "dedupStrategy": "none",
++        "sortOrder": "Descending"
++      }
++    },
++    {
++      "id": 6,
++      "type": "logs",
++      "title": "Auth-Log – fehlgeschlagene Logins",
++      "datasource": {
++        "type": "loki",
++        "uid": "loki"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 24,
++        "w": 24,
++        "h": 8
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "loki",
++            "uid": "loki"
++          },
++          "expr": "{job=\"auth\"} |~ `(?i)(failed|invalid|failure|authentication failure)`",
++          "queryType": "range"
++        }
++      ],
++      "options": {
++        "showTime": true,
++        "showLabels": false,
++        "showCommonLabels": false,
++        "wrapLogMessage": true,
++        "prettifyLogMessage": false,
++        "enableLogDetails": true,
++        "dedupStrategy": "none",
++        "sortOrder": "Descending"
++      }
++    }
++  ]
++}
+diff --git a/config/grafana/dashboards/apphost-overview.json b/config/grafana/dashboards/apphost-overview.json
+new file mode 100644
+index 0000000..b33df72
+--- /dev/null
++++ b/config/grafana/dashboards/apphost-overview.json
+@@ -0,0 +1,784 @@
++{
++  "uid": "apphost-overview",
++  "title": "AppHost – Übersicht",
++  "tags": [
++    "apphost",
++    "overview"
++  ],
++  "editable": true,
++  "schemaVersion": 39,
++  "version": 1,
++  "refresh": "30s",
++  "time": {
++    "from": "now-6h",
++    "to": "now"
++  },
++  "timezone": "browser",
++  "graphTooltip": 1,
++  "templating": {
++    "list": []
++  },
++  "annotations": {
++    "list": []
++  },
++  "panels": [
++    {
++      "id": 1,
++      "type": "row",
++      "title": "Status",
++      "collapsed": false,
++      "gridPos": {
++        "x": 0,
++        "y": 0,
++        "w": 24,
++        "h": 1
++      },
++      "panels": []
++    },
++    {
++      "id": 2,
++      "type": "stat",
++      "title": "Targets erreichbar",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 1,
++        "w": 6,
++        "h": 4
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "sum(up)"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "none",
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "red",
++                "value": null
++              },
++              {
++                "color": "green",
++                "value": 1
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "colorMode": "value",
++        "graphMode": "area",
++        "justifyMode": "auto",
++        "textMode": "auto",
++        "orientation": "auto"
++      }
++    },
++    {
++      "id": 3,
++      "type": "stat",
++      "title": "Down-Targets",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 6,
++        "y": 1,
++        "w": 6,
++        "h": 4
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "count(up == 0) or vector(0)"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "none",
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "green",
++                "value": null
++              },
++              {
++                "color": "red",
++                "value": 1
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "colorMode": "background",
++        "graphMode": "area",
++        "justifyMode": "auto",
++        "textMode": "auto",
++        "orientation": "auto"
++      }
++    },
++    {
++      "id": 4,
++      "type": "stat",
++      "title": "Container laufend",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 12,
++        "y": 1,
++        "w": 6,
++        "h": 4
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "count(count by (name) (container_last_seen{name!=\"\"}))"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "none",
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "green",
++                "value": null
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "colorMode": "value",
++        "graphMode": "area",
++        "justifyMode": "auto",
++        "textMode": "auto",
++        "orientation": "auto"
++      }
++    },
++    {
++      "id": 5,
++      "type": "stat",
++      "title": "Host-Uptime",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 18,
++        "y": 1,
++        "w": 6,
++        "h": 4
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "node_time_seconds - node_boot_time_seconds"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "s",
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "green",
++                "value": null
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "colorMode": "value",
++        "graphMode": "none",
++        "justifyMode": "auto",
++        "textMode": "auto",
++        "orientation": "auto"
++      }
++    },
++    {
++      "id": 6,
++      "type": "row",
++      "title": "Host",
++      "collapsed": false,
++      "gridPos": {
++        "x": 0,
++        "y": 5,
++        "w": 24,
++        "h": 1
++      },
++      "panels": []
++    },
++    {
++      "id": 7,
++      "type": "timeseries",
++      "title": "CPU-Auslastung",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 6,
++        "w": 12,
++        "h": 7
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
++          "legendFormat": "CPU"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "percent",
++          "custom": {
++            "drawStyle": "line",
++            "lineInterpolation": "smooth",
++            "lineWidth": 1,
++            "fillOpacity": 10,
++            "showPoints": "never",
++            "spanNulls": true,
++            "stacking": {
++              "mode": "none",
++              "group": "A"
++            },
++            "axisPlacement": "auto"
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "legend": {
++          "displayMode": "list",
++          "placement": "bottom",
++          "calcs": []
++        },
++        "tooltip": {
++          "mode": "multi",
++          "sort": "desc"
++        }
++      }
++    },
++    {
++      "id": 8,
++      "type": "timeseries",
++      "title": "RAM-Auslastung",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 12,
++        "y": 6,
++        "w": 12,
++        "h": 7
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100",
++          "legendFormat": "RAM"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "percent",
++          "custom": {
++            "drawStyle": "line",
++            "lineInterpolation": "smooth",
++            "lineWidth": 1,
++            "fillOpacity": 10,
++            "showPoints": "never",
++            "spanNulls": true,
++            "stacking": {
++              "mode": "none",
++              "group": "A"
++            },
++            "axisPlacement": "auto"
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "legend": {
++          "displayMode": "list",
++          "placement": "bottom",
++          "calcs": []
++        },
++        "tooltip": {
++          "mode": "multi",
++          "sort": "desc"
++        }
++      }
++    },
++    {
++      "id": 9,
++      "type": "gauge",
++      "title": "Disk / (root)",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 13,
++        "w": 6,
++        "h": 6
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "100 - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs\"} * 100"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "percent",
++          "min": 0,
++          "max": 100,
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "green",
++                "value": null
++              },
++              {
++                "color": "yellow",
++                "value": 70
++              },
++              {
++                "color": "red",
++                "value": 85
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "showThresholdLabels": false,
++        "showThresholdMarkers": true
++      }
++    },
++    {
++      "id": 10,
++      "type": "gauge",
++      "title": "Disk /mnt/media",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 6,
++        "y": 13,
++        "w": 6,
++        "h": 6
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "100 - node_filesystem_avail_bytes{mountpoint=\"/mnt/media\"} / node_filesystem_size_bytes{mountpoint=\"/mnt/media\"} * 100"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "percent",
++          "min": 0,
++          "max": 100,
++          "color": {
++            "mode": "thresholds"
++          },
++          "thresholds": {
++            "mode": "absolute",
++            "steps": [
++              {
++                "color": "green",
++                "value": null
++              },
++              {
++                "color": "yellow",
++                "value": 70
++              },
++              {
++                "color": "red",
++                "value": 85
++              }
++            ]
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "reduceOptions": {
++          "calcs": [
++            "lastNotNull"
++          ],
++          "fields": "",
++          "values": false
++        },
++        "showThresholdLabels": false,
++        "showThresholdMarkers": true
++      }
++    },
++    {
++      "id": 11,
++      "type": "timeseries",
++      "title": "Load (1m/5m/15m)",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 12,
++        "y": 13,
++        "w": 12,
++        "h": 6
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "node_load1",
++          "legendFormat": "1m"
++        },
++        {
++          "refId": "B",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "node_load5",
++          "legendFormat": "5m"
++        },
++        {
++          "refId": "C",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "node_load15",
++          "legendFormat": "15m"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "short",
++          "custom": {
++            "drawStyle": "line",
++            "lineInterpolation": "smooth",
++            "lineWidth": 1,
++            "fillOpacity": 10,
++            "showPoints": "never",
++            "spanNulls": true,
++            "stacking": {
++              "mode": "none",
++              "group": "A"
++            },
++            "axisPlacement": "auto"
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "legend": {
++          "displayMode": "list",
++          "placement": "bottom",
++          "calcs": []
++        },
++        "tooltip": {
++          "mode": "multi",
++          "sort": "desc"
++        }
++      }
++    },
++    {
++      "id": 12,
++      "type": "row",
++      "title": "Traefik",
++      "collapsed": false,
++      "gridPos": {
++        "x": 0,
++        "y": 19,
++        "w": 24,
++        "h": 1
++      },
++      "panels": []
++    },
++    {
++      "id": 13,
++      "type": "timeseries",
++      "title": "Requests/s je Service",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 20,
++        "w": 12,
++        "h": 7
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "sum by (service) (rate(traefik_service_requests_total[5m]))",
++          "legendFormat": "{{service}}"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "reqps",
++          "custom": {
++            "drawStyle": "line",
++            "lineInterpolation": "smooth",
++            "lineWidth": 1,
++            "fillOpacity": 10,
++            "showPoints": "never",
++            "spanNulls": true,
++            "stacking": {
++              "mode": "none",
++              "group": "A"
++            },
++            "axisPlacement": "auto"
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "legend": {
++          "displayMode": "table",
++          "placement": "bottom",
++          "calcs": [
++            "mean",
++            "max",
++            "lastNotNull"
++          ]
++        },
++        "tooltip": {
++          "mode": "multi",
++          "sort": "desc"
++        }
++      }
++    },
++    {
++      "id": 14,
++      "type": "timeseries",
++      "title": "5xx-Fehler/s je Service",
++      "datasource": {
++        "type": "prometheus",
++        "uid": "prometheus"
++      },
++      "gridPos": {
++        "x": 12,
++        "y": 20,
++        "w": 12,
++        "h": 7
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "prometheus",
++            "uid": "prometheus"
++          },
++          "expr": "sum by (service) (rate(traefik_service_requests_total{code=~\"5..\"}[5m]))",
++          "legendFormat": "{{service}}"
++        }
++      ],
++      "fieldConfig": {
++        "defaults": {
++          "unit": "reqps",
++          "custom": {
++            "drawStyle": "line",
++            "lineInterpolation": "smooth",
++            "lineWidth": 1,
++            "fillOpacity": 10,
++            "showPoints": "never",
++            "spanNulls": true,
++            "stacking": {
++              "mode": "none",
++              "group": "A"
++            },
++            "axisPlacement": "auto"
++          }
++        },
++        "overrides": []
++      },
++      "options": {
++        "legend": {
++          "displayMode": "table",
++          "placement": "bottom",
++          "calcs": [
++            "mean",
++            "max",
++            "lastNotNull"
++          ]
++        },
++        "tooltip": {
++          "mode": "multi",
++          "sort": "desc"
++        }
++      }
++    },
++    {
++      "id": 15,
++      "type": "row",
++      "title": "Logs – Fehler (alle Container)",
++      "collapsed": false,
++      "gridPos": {
++        "x": 0,
++        "y": 27,
++        "w": 24,
++        "h": 1
++      },
++      "panels": []
++    },
++    {
++      "id": 16,
++      "type": "logs",
++      "title": "Fehler-/Fatal-Logs",
++      "datasource": {
++        "type": "loki",
++        "uid": "loki"
++      },
++      "gridPos": {
++        "x": 0,
++        "y": 28,
++        "w": 24,
++        "h": 10
++      },
++      "targets": [
++        {
++          "refId": "A",
++          "datasource": {
++            "type": "loki",
++            "uid": "loki"
++          },
++          "expr": "{service=~\".+\"} |~ `(?i)(error|fatal|panic|fail)`",
++          "queryType": "range"
++        }
++      ],
++      "options": {
++        "showTime": true,
++        "showLabels": false,
++        "showCommonLabels": false,
++        "wrapLogMessage": true,
++        "prettifyLogMessage": false,
++        "enableLogDetails": true,
++        "dedupStrategy": "none",
++        "sortOrder": "Descending"
++      }
++    }
++  ]
++}
