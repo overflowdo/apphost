@@ -11,7 +11,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-env_val()  { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2-; }
+# || true: grep liefert bei keinem Treffer Exit 1 -> mit `set -o pipefail` würde
+# eine Zuweisung `x="$(env_val …)"` das Skript unter `set -e` abbrechen.
+env_val()  { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2- || true; }
 file_val() { [[ -f "$1" ]] && cat "$1" || echo "(fehlt – ggf. 'up' bzw. regen-secrets ausführen)"; }
 line()     { printf '  %-24s %s\n' "$1" "$2"; }
 hr()       { printf '%s\n' "══════════════════════════════════════════════════════════════"; }
@@ -35,7 +37,7 @@ echo "▶ Kalender – Radicale (für DAVx5 am Handy)"
 # (Format 'user:$2y$...') lesen; sonst Default 'admin'.
 rad_user="$(env_val RADICALE_USER)"
 if [[ -z "$rad_user" && -f secrets/radicale_users ]]; then
-    rad_user="$(cut -d: -f1 secrets/radicale_users 2>/dev/null | head -1)"
+    rad_user="$(cut -d: -f1 secrets/radicale_users 2>/dev/null | head -1 || true)"
 fi
 line "Nutzer"   "${rad_user:-admin}"
 line "Passwort" "$(file_val secrets/radicale_password.txt)"

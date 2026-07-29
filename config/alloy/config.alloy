@@ -34,7 +34,21 @@ discovery.relabel "docker_containers" {
 loki.source.docker "containers" {
   host       = "unix:///run/docker.sock"
   targets    = discovery.relabel.docker_containers.output
+  forward_to = [loki.process.drop_noise.receiver]
+}
+
+// Verwirft bekannte, harmlose Rausch-Zeilen aus Container-Logs, bevor sie in
+// Loki landen (sonst tauchen sie im Fehler-Dashboard auf). Aktuell: cadvisor
+// kann das LUKS-btrfs-Root-Device (/dev/mapper/cryptroot) aus seinem Container
+// nicht stat-en -> "Unable to get btrfs mountpoint IDs". Rein kosmetisch,
+// Container-Metriken werden trotzdem vollständig erfasst.
+loki.process "drop_noise" {
   forward_to = [loki.write.loki.receiver]
+
+  stage.drop {
+    expression          = ".*Unable to get btrfs mountpoint IDs.*"
+    drop_counter_reason = "cadvisor_btrfs_noise"
+  }
 }
 
 // Host System Logs
