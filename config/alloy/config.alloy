@@ -49,6 +49,20 @@ loki.process "drop_noise" {
     expression          = ".*Unable to get btrfs mountpoint IDs.*"
     drop_counter_reason = "cadvisor_btrfs_noise"
   }
+
+  // Alloy-Eigenrauschen: transiente Meldung, wenn ein getailter Container
+  // neu startet/stoppt und der Log-Stream abreißt (harmlos).
+  stage.drop {
+    expression          = ".*could not transfer logs.*"
+    drop_counter_reason = "alloy_tailer_restart_noise"
+  }
+
+  // Alloy remotecfg ist nicht konfiguriert -> "noop client"; die
+  // Registrierungs-Fehlermeldung ist folgenlos.
+  stage.drop {
+    expression          = ".*failed to register collector with remote server.*"
+    drop_counter_reason = "alloy_remotecfg_noise"
+  }
 }
 
 // Host System Logs
