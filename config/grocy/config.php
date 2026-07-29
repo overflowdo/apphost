@@ -23,3 +23,19 @@ Setting('FEATURE_FLAG_TASKS', false);       // Aufgaben
 Setting('FEATURE_FLAG_BATTERIES', false);   // Batterien
 Setting('FEATURE_FLAG_EQUIPMENT', false);   // Geräte
 Setting('FEATURE_FLAG_CALENDAR', false);    // Kalender
+
+// --- Single-Sign-on über Authelia (kein zweiter Grocy-Login) ---------------
+// Grocy vertraut dem von Authelia via Traefik weitergereichten Remote-User-
+// Header (forward-auth -> authResponseHeaders in
+// config/traefik/dynamic/middlewares.yml). Der Authelia-Login (dein custom
+// Passwort) ist damit die einzige Anmeldung; admin/admin entfällt.
+//
+// SICHERHEIT: Der Header darf NIE vom Client kommen -> die authelia-chain
+// strippt client-gesetzte Remote-User-Header vor forward-auth (middlewares.yml).
+//
+// Header EXAKT wie Traefik ihn sendet ("Remote-User"); Grocy liest ihn per
+// PSR-7 getHeader() (Bindestrich, NICHT der Default "REMOTE_USER").
+// Der übermittelte Nutzername (Authelia-Login, i.d.R. "admin") muss einem
+// Grocy-Nutzer entsprechen – der Default-Nutzer "admin" existiert bereits.
+Setting('AUTH_CLASS', 'Grocy\\Middleware\\ReverseProxyAuthMiddleware');
+Setting('REVERSE_PROXY_AUTH_HEADER', 'Remote-User');

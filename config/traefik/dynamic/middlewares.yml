@@ -132,10 +132,16 @@ http:
         middlewares:
           - tor-opencloud-headers
           - compress
-    # Authelia-Kette – ForwardAuth für Services ohne eigenes OIDC
+    # Authelia-Kette – ForwardAuth für Services ohne eigenes OIDC.
+    # strip-remote-user MUSS vor forward-auth stehen: es löscht client-gesetzte
+    # Remote-User/-Groups/-Name/-Email-Header, danach setzt forward-auth die von
+    # Authelia authentifizierten Werte (authResponseHeaders). Ohne das Strippen
+    # könnte ein eingeloggter Nutzer den Header spoofen – kritisch, seit Grocy
+    # dem Remote-User-Header für sein SSO vertraut (config/grocy/config.php).
     authelia-chain:
       chain:
         middlewares:
+          - strip-remote-user
           - forward-auth
           - security-headers
           - compress
@@ -169,6 +175,7 @@ http:
     tor-authelia-chain:
       chain:
         middlewares:
+          - strip-remote-user
           - forward-auth
           - tor-headers
           - compress

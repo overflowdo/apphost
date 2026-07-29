@@ -3,8 +3,10 @@
 #   secrets/radicale_users         – user:bcrypt-hash (von Radicale gelesen)
 #   secrets/radicale_password.txt  – Klartext-Passwort (für den DAVx5-Login am Handy)
 #
-# Nutzer kommt aus .env (RADICALE_USER, Default "admin"). Das Passwort wird einmalig
-# zufällig erzeugt und bleibt danach erhalten (idempotent).
+# Nutzer kommt aus .env (RADICALE_USER, Default "admin"). Passwort: setzt du
+# RADICALE_PASSWORD in .env, wird genau das genommen (custom, wie bei den anderen
+# Diensten) – sonst wird einmalig eins zufällig erzeugt. Danach idempotent
+# (bestehende Dateien bleiben; Passwort ändern -> Dateien löschen + neu erzeugen).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,6 +21,7 @@ PW_FILE="$SECRETS_DIR/radicale_password.txt"
 set -a; # shellcheck source=/dev/null
 source "$ENV_FILE"; set +a
 RADICALE_USER="${RADICALE_USER:-admin}"
+RADICALE_PASSWORD="${RADICALE_PASSWORD:-}"
 
 mkdir -p "$SECRETS_DIR"
 
@@ -27,9 +30,13 @@ if [[ -f "$USERS_FILE" && -f "$PW_FILE" ]]; then
     exit 0
 fi
 
-# Zufälliges Passwort (nur beim ersten Mal). openssl ist auf dem Live-ISO nicht da
-# -> via nix; bcrypt-Hash via mkpasswd.
-PW="$(nix run --extra-experimental-features 'nix-command flakes' nixpkgs#openssl -- rand -hex 16 2>/dev/null || openssl rand -hex 16)"
+# Passwort: aus .env (RADICALE_PASSWORD) falls gesetzt, sonst zufällig (nur beim
+# ersten Mal). openssl ist auf dem Live-ISO nicht da -> via nix; Hash via mkpasswd.
+if [[ -n "$RADICALE_PASSWORD" ]]; then
+    PW="$RADICALE_PASSWORD"
+else
+    PW="$(nix run --extra-experimental-features 'nix-command flakes' nixpkgs#openssl -- rand -hex 16 2>/dev/null || openssl rand -hex 16)"
+fi
 HASH="$(printf '%s' "$PW" | nix-shell -p mkpasswd --run 'mkpasswd -m bcrypt -s' 2>/dev/null || mkpasswd -m bcrypt "$PW")"
 
 printf '%s:%s\n' "$RADICALE_USER" "$HASH" > "$USERS_FILE"

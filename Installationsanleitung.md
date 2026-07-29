@@ -468,7 +468,7 @@ Produkte gruppieren (z. B. verschiedene Tomatensoßen) – kein Flag nötig, ein
 - **Produktgruppen** (Stammdaten) – reine Kategorie/Sortierung.
 - **Eltern-/Kind-Produkte** – „egal welche Sorte zählt als ein Bestand" mit kumuliertem Mindestbestand.
 
-Erster Grocy-Login: `admin` / `admin` (danach ändern); der Dienst liegt zusätzlich hinter Authelia-SSO.
+**Login:** Grocy nutzt echtes Single-Sign-on über Authelia (Reverse-Proxy-Auth, `config/grocy/config.php`) – **kein zweiter Login**. Der Authelia-Login (dein custom Passwort) ist die einzige Anmeldung; der übermittelte Nutzername (i. d. R. `admin`) wird auf den gleichnamigen Grocy-Nutzer abgebildet. Damit das sicher ist, entfernt die `authelia-chain` client-gesetzte `Remote-User`-Header, bevor Authelia den authentifizierten Wert setzt (`config/traefik/dynamic/middlewares.yml`).
 
 ---
 
