@@ -133,12 +133,24 @@ in
     description = "Weekly Docker Image Security Scan";
     startAt     = "Mon 02:00";
     # Fehlschlag per Push melden (Template-Unit in modules/backup.nix).
+    # ACHTUNG, was das heißt: trivy läuft bewusst mit --exit-code 0, der Scan
+    # ist informativ. Diese Unit schlägt also NICHT bei Funden fehl, sondern
+    # nur, wenn der Scan selbst nicht laufen kann (Docker weg, trivy kaputt,
+    # Log nicht schreibbar). Für die Funde selbst gibt es bewusst keinen Alarm
+    # – bei wöchentlich neuen CVEs wäre das ein Dauerton. Stattdessen steht
+    # die Anzahl am Ende des Logs.
     onFailure   = [ "apphost-notify-failure@%n.service" ];
     script      = ''
       docker ps --format "{{.Image}}" | sort -u | while read image; do
         ${pkgs.trivy}/bin/trivy image --severity HIGH,CRITICAL \
           --exit-code 0 --no-progress "$image" 2>/dev/null || true
       done | tee /var/log/docker-security-scan.log
+
+      # Kurzfazit ans Ende, damit man nicht das ganze Log lesen muss.
+      HIGH=$(grep -c "HIGH" /var/log/docker-security-scan.log || true)
+      CRIT=$(grep -c "CRITICAL" /var/log/docker-security-scan.log || true)
+      echo "Zusammenfassung: $CRIT CRITICAL-, $HIGH HIGH-Zeilen (Details: less /var/log/docker-security-scan.log)" \
+        | tee -a /var/log/docker-security-scan.log
     '';
     serviceConfig = {
       Type = "oneshot";
