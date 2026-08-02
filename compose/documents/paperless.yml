@@ -26,7 +26,7 @@ services:
     env_file:
       - ../../secrets/oidc-paperless.env
     environment:
-      PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_REDIS: redis://:${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}@paperless-redis:6379
       PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?}
       PAPERLESS_URL: https://paperless.${DOMAIN}
       # OIDC-Login gegen Authelia über die lokale CA vertrauen (Python requests)
@@ -86,7 +86,7 @@ services:
     networks: [documents-network]
     volumes:
       - paperless_redis:/data
-    command: ["valkey-server", "--save", "60", "1", "--loglevel", "warning", "--maxmemory", "128mb"]
+    command: ["valkey-server", "--save", "60", "1", "--loglevel", "warning", "--maxmemory", "128mb", "--requirepass", "${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}"]
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
     user: "999:999"

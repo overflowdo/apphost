@@ -26,11 +26,12 @@ echo "▶ SSO (Authelia) – Login vor fast allen Web-Diensten"
 line "Nutzer"   "$(env_val AUTHELIA_ADMIN_USER)"
 line "Passwort" "$(env_val AUTHELIA_ADMIN_PASSWORD)"
 echo
-echo "▶ App-eigene Logins"
-line "Grafana (admin)"   "$(env_val GRAFANA_ADMIN_PASSWORD)"
-line "OpenCloud (admin)" "$(env_val OPENCLOUD_ADMIN_PASSWORD)"
-line "Grocy"             "SSO über Authelia (kein eigener Login)"
-line "ntfy (admin)"      "$(env_val NTFY_ADMIN_PASSWORD)"
+echo "▶ App-eigene Logins        (Nutzer / Passwort)"
+line "Grafana"    "admin / $(env_val GRAFANA_ADMIN_PASSWORD)"
+line "OpenCloud"  "admin / $(env_val OPENCLOUD_ADMIN_PASSWORD)"
+line "ntfy"       "admin / $(env_val NTFY_ADMIN_PASSWORD)"
+line "Bichon"     "admin / admin@bichon   (Image-Standard; 1. Login ändern: Settings->Profile)"
+line "Grocy"      "SSO über Authelia (kein eigener Login)"
 echo
 echo "▶ Kalender – Radicale (für DAVx5 am Handy)"
 # Nutzer: bevorzugt aus .env; fehlt RADICALE_USER dort, aus der htpasswd-Datei
@@ -42,12 +43,13 @@ fi
 line "Nutzer"   "${rad_user:-admin}"
 line "Passwort" "$(file_val secrets/radicale_password.txt)"
 echo
-echo "▶ Vaultwarden – /admin-Token"
-line "Token" "$(file_val secrets/vaultwarden_admin_token.txt)"
+echo "▶ Vaultwarden"
+line "/admin-Panel" "Token: $(file_val secrets/vaultwarden_admin_token.txt)"
+line "Nutzer-Login" "Registrierung AUS -> Konto in /admin einladen; Master-PW wählst du selbst"
 echo
 echo "▶ Immich – OIDC-Client-Secret (manuell in der Immich-Admin-UI eintragen)"
 if [[ -f secrets/oidc-immich.env ]]; then
-    grep -E "SECRET" secrets/oidc-immich.env | sed 's/^/  /'
+    grep -E "SECRET" secrets/oidc-immich.env | sed 's/^/  /' || true
 else
     echo "  (fehlt)"
 fi
