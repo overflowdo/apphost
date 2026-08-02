@@ -613,7 +613,13 @@ Damit die komplette `apphost`-VM im Notfall wiederhergestellt werden kann, sollt
 
 Ein VM-Snapshot ist **crash-konsistent**: Er hält den Zustand der Blockgeräte fest, nicht den der Anwendungen. Für die Postgres-Datenbank von Immich und die SQLite-Datenbanken von Authelia, Grafana, Vaultwarden und Paperless heißt das, dass der Snapshot eine Datei mitten in einer Transaktion erwischen kann – beim Zurückspielen ist das im besten Fall eine Recovery, im schlechtesten eine korrupte Datei.
 
-Deshalb legt der systemd-Timer `apphost-db-backup` täglich um **02:30** saubere Dumps unter `/var/backups/apphost` ab (`pg_dump` für Postgres, die SQLite-Online-Backup-API für den Rest). Die liegen dort als normale Dateien und werden vom Proxmox-Snapshot einfach mitgesichert. Aufbewahrt werden 14 Tage.
+Deshalb legt der systemd-Timer `apphost-db-backup` täglich um **02:30** saubere Dumps unter `/var/backups/apphost` ab (`pg_dumpall` für Postgres, die SQLite-Online-Backup-API für den Rest). Die liegen dort als normale Dateien und werden vom Proxmox-Snapshot einfach mitgesichert. Aufbewahrt werden 14 Tage. Jeder SQLite-Dump wird direkt nach dem Schreiben mit `PRAGMA quick_check` gegengeprüft – ein unbrauchbares Backup soll dort auffallen und nicht erst beim Restore.
+
+Schlägt der Lauf fehl, geht eine Push-Nachricht an ntfy (Topic `apphost-critical`, dieselbe Kette wie die kritischen Alerts). Dafür sorgt eine `OnFailure=`-Unit, die auch an `aide-check` und `docker-security-scan` hängt – systemd-Dienste tauchen sonst in keinem Alert auf, weil Prometheus sie nicht scrapt. Testen:
+
+```bash
+sudo systemctl start apphost-notify-failure@apphost-db-backup.service
+```
 
 ```bash
 backup-db                                   # von Hand anstoßen
@@ -621,12 +627,25 @@ systemctl status apphost-db-backup          # letzter Lauf
 ls -lh /var/backups/apphost                 # vorhandene Dumps
 ```
 
+> [!NOTE]
+> **Backups, die den Host verlassen**, brauchen eine eigene Verschlüsselung: die Paperless-Datenbank enthält alle Dokument-Metadaten im Klartext, und die Schlüssel für die verschlüsselten Teile (Authelia-TOTP-Secrets, Grafana-Datasource-Secrets) liegen in derselben `.env` auf derselben Platte. Dafür `BACKUP_AGE_RECIPIENT` in der `.env` auf einen age-Public-Key setzen – dann wird jeder Dump zusätzlich mit `age` verschlüsselt und das Klartext-Original entfernt.
+>
+> ```bash
+> age-keygen -o ~/apphost-backup.key          # Schlüsselpaar (Public Key wird ausgegeben)
+> age -d -i ~/apphost-backup.key datei.age    # entschlüsseln
+> ```
+
+> [!WARNING]
+> **OpenCloud ist nicht abgedeckt.** Es hält seine Metadaten in einem eingebetteten NATS/JetStream-KV-Store, nicht in einer Datenbank, die sich von außen konsistent dumpen ließe – dort bleibt es beim crash-konsistenten Snapshot. Wer das sauber will, stoppt den Dienst für den Snapshot kurz (`docker compose stop opencloud`).
+>
+> Und: Ein Backup ist erst dann eines, wenn der Restore einmal durchgespielt wurde. Für den Immich-Dump gilt das besonders, weil er voraussetzt, dass `POSTGRES_USER=immich` im Image tatsächlich Superuser ist. Einmal in eine Wegwerf-VM zurückspielen, bevor man sich darauf verlässt.
+
 Wiederherstellen (Beispiele):
 
 ```bash
-# Postgres (Immich)
+# Postgres (Immich) – pg_dumpall-Dump geht gegen die Wartungs-DB
 gunzip -c /var/backups/apphost/immich-postgres_<stamp>.sql.gz \
-  | docker exec -i immich-postgres psql -U immich -d immich
+  | docker exec -i immich-postgres psql -U immich -d postgres
 
 # SQLite (hier Vaultwarden) – Container vorher stoppen
 docker compose stop vaultwarden
