@@ -64,6 +64,11 @@
           # Loopback immer erlauben
           iif lo accept
 
+          # Pakete, die zu keinem gültigen Conntrack-Eintrag passen (z.B. späte
+          # RSTs, Fragment-Spielereien), früh verwerfen – sie sollen weder eine
+          # der Regeln unten treffen noch in der Log-Regel landen.
+          ct state invalid drop
+
           # Docker-interne Kommunikation
           jump docker_input
 
@@ -98,8 +103,13 @@
           # Prometheus Node-Exporter (nur von Monitoring-Netz)
           # ip saddr 172.20.0.0/24 tcp dport 9100 accept
 
-          # Alles andere DROP + Logging
-          log prefix "[nftables DROP] " level warn
+          # Alles andere DROP + Logging – aber gedrosselt. Solange die Kette
+          # 192.168.0.0/16 pauschal akzeptierte, wurde der komplette
+          # LAN-Broadcast/Multicast vorher weggefangen. Jetzt landet alles davon
+          # hier: SSDP, mDNS, NetBIOS, DHCP, IGMP von jedem Gerät im Heimnetz.
+          # Ungedrosselt schreibt das dauerhaft in ein Journal mit
+          # Storage=persistent und SystemMaxUse=4G und verdrängt echte Logs.
+          limit rate 10/minute burst 20 packets log prefix "[nftables DROP] " level warn
         }
 
         chain forward {
@@ -107,6 +117,7 @@
 
           # Etablierte Verbindungen
           ct state established,related accept
+          ct state invalid drop
 
           # Docker-Bridge zu außen (NAT/Masquerade läuft in nat-Table)
           ip saddr 172.16.0.0/12 accept
