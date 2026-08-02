@@ -16,7 +16,14 @@ services:
       DOMAIN: https://${VAULTWARDEN_SUBDOMAIN:-vault}.${DOMAIN}
       ADMIN_TOKEN: ${VAULTWARDEN_ADMIN_TOKEN:?}
       SIGNUPS_ALLOWED: "false"
-      INVITATIONS_ALLOWED: "true"
+      # INVITATIONS_ALLOWED war "true", ohne dass SMTP konfiguriert ist – die
+      # Einladung konnte also gar nicht zugestellt werden. Zusammen mit
+      # SIGNUPS_ALLOWED: false sah das nach einem funktionierenden Weg aus, war
+      # aber keiner. Nutzer werden über das /admin-Panel angelegt:
+      #   https://vault.<domain>/admin  (Token: secrets/vaultwarden_admin_token.txt)
+      # Wer echte Einladungen per Mail will, muss SMTP_* ergänzen und das hier
+      # wieder auf "true" setzen.
+      INVITATIONS_ALLOWED: "false"
       LOG_LEVEL: warn
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
