@@ -1,4 +1,7 @@
 { config, pkgs, lib, ... }:
+let
+  userns = import ../lib/userns.nix;
+in
 {
   # Kernel-Module für Container-Runtimes
   boot.kernelModules = [
@@ -79,12 +82,12 @@
     trivy
   ];
 
-  # dockremap für sichere container in jedem fall. UID/GID 100000-165536 für rootless remap
+  # dockremap für sichere container in jedem fall. UID/GID-Bereich siehe ../lib/userns.nix
   users.users.dockremap = {
     isSystemUser = true;
     group        = "dockremap";
-    subUidRanges = [{ startUid = 100000; count = 65536; }];
-    subGidRanges = [{ startGid = 100000; count = 65536; }];
+    subUidRanges = [{ startUid = userns.remapBase; count = userns.remapCount; }];
+    subGidRanges = [{ startGid = userns.remapBase; count = userns.remapCount; }];
   };
   users.groups.dockremap = {};
 
@@ -100,6 +103,9 @@
   # Docker-Socket nur für docker-Gruppe zugänglich
   systemd.tmpfiles.rules = [
     "d /run/docker 0750 root docker -"
+    # Traefik-Access-Log (fail2ban-Jail traefik-auth in modules/security.nix liest
+    # es). Der Traefik-Container läuft als Container-root -> Host-UID = remapBase.
+    "d /var/log/traefik 0750 ${toString userns.remapBase} ${toString userns.remapBase} -"
   ];
 
   # Containerd (für Kata Containers)

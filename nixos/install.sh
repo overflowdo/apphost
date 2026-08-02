@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
+#
+# Unbeaufsichtigter Lauf (z.B. für Tests): die beiden interaktiven Abfragen
+# lassen sich über Umgebungsvariablen vorbelegen –
+#
+#   APPHOST_PASSWORD_HASH   crypt(3)-Hash für den apphost-Nutzer (mkpasswd -m sha-512)
+#   APPHOST_SSH_PUBKEY      SSH Public Key für den apphost-Nutzer
+#   APPHOST_DISK_ENCRYPTION "true"/"false" – überspringt die LUKS-Abfrage
+#
+# Vorher wurden dafür die Positionsargumente $3 und $4 gelesen ($1/$2 gab es
+# nie). Ein Passwort-Hash in argv ist zudem für jeden auf dem System via `ps`
+# sichtbar – Umgebungsvariablen sind hier das kleinere Übel und passen zu dem,
+# was das Skript beim Python-Schritt weiter unten ohnehin schon macht.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,9 +42,9 @@ echo "  Bitte wählen Sie ein sicheres Passwort für Ihren Nutzer."
 echo "  Dieses Passwort wird für 'sudo' benötigt (zweiter Faktor nach SSH-Key)."
 echo ""
 
-if [[ $# -ge 3 ]]; then
-  HASHED_PASSWORD="$3"
-  info "Passwort-Hash Argument gesetzt, überspringe."
+if [[ -n "${APPHOST_PASSWORD_HASH:-}" ]]; then
+  HASHED_PASSWORD="$APPHOST_PASSWORD_HASH"
+  info "APPHOST_PASSWORD_HASH gesetzt, überspringe die Abfrage."
 else
   while true; do
     read -rsp "  Passwort: " PW1; echo ""
@@ -69,13 +81,23 @@ echo "  Optional kann die Root-Partition zusätzlich mit LUKS2 verschlüsselt we
 echo "  Achtung: Danach wird bei JEDEM Boot eine Passphrase über die Server-Konsole benötigt"
 echo "  > Kein unbeaufsichtigter Neustart, kein Boot ohne Konsolenzugriff (z.B. über die Proxmox-Konsole)."
 echo ""
-read -rp "  Festplattenverschlüsselung aktivieren? [j/N]: " ENC_ANSWER
-if [[ "$ENC_ANSWER" =~ ^[jJyY] ]]; then
+# Default JA. Ohne Verschlüsselung liegen alle Klartext-Passwörter unverschlüsselt
+# auf der Platte: .env (Quelle des `secrets`-Alias), secrets/radicale_password.txt,
+# secrets/vaultwarden_admin_token.txt. Wer die Platte (oder das Proxmox-Disk-Image)
+# in die Hand bekommt, hat damit alles. Abschalten ist eine bewusste Entscheidung,
+# kein Default.
+if [[ -n "${APPHOST_DISK_ENCRYPTION:-}" ]]; then
+  ENC_ANSWER="$APPHOST_DISK_ENCRYPTION"
+  info "APPHOST_DISK_ENCRYPTION=$ENC_ANSWER gesetzt, überspringe die Abfrage."
+else
+  read -rp "  Festplattenverschlüsselung aktivieren? [J/n]: " ENC_ANSWER
+fi
+if [[ -z "$ENC_ANSWER" || "$ENC_ANSWER" =~ ^([jJyY]|[tT]rue) ]]; then
   DISK_ENCRYPTION=true
-  warn "Festplattenverschlüsselung aktiviert. Die Passphrase wird gleich bei der Formatierung festgelegt."
+  warn "Festplattenverschlüsselung aktiviert (Standard). Die Passphrase wird gleich bei der Formatierung festgelegt."
 else
   DISK_ENCRYPTION=false
-  info "Festplattenverschlüsselung deaktiviert (Standard)."
+  warn "Festplattenverschlüsselung DEAKTIVIERT – .env und secrets/ liegen unverschlüsselt auf der Platte."
 fi
 
 cat > "$REPO_DIR/nixos/disk-encryption.nix" << NIXEOF
@@ -84,9 +106,9 @@ $DISK_ENCRYPTION
 NIXEOF
 
 SSH_KEY_REGEX='^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|sk-ssh-ed25519@openssh.com|sk-ecdsa-sha2-nistp256@openssh.com) [A-Za-z0-9+/]+=*( .*)?$'
-if [[ $# -ge 4 ]]; then
-  SSH_PUBKEY="$4"
-  info "SSH Public Key Argument gesetzt, überspringe."
+if [[ -n "${APPHOST_SSH_PUBKEY:-}" ]]; then
+  SSH_PUBKEY="$APPHOST_SSH_PUBKEY"
+  info "APPHOST_SSH_PUBKEY gesetzt, überspringe die Abfrage."
 else
   while true; do
     read -rp "  SSH Public Key: " SSH_PUBKEY
@@ -323,6 +345,7 @@ ENV_NTFY_ALERT="$(_randhex)"
 ENV_IMMICH_DB="$(_randhex)"
 ENV_IMMICH_JWT="$(_randhex 32)"
 ENV_PAPERLESS_SECRET="$(_randhex 32)"
+ENV_PAPERLESS_REDIS="$(_randhex)"
 ENV_COLLABORA_ADMIN="$(_randhex)"
 ENV_GRAFANA_SECRET="$(_randhex 32)"
 
@@ -351,7 +374,7 @@ DOMAIN="$ENV_DOMAIN" ACME_EMAIL="$ENV_ACME_EMAIL" CF_DNS_API_TOKEN="$ENV_CF_TOKE
 AUTHELIA_ADMIN_USER="$ENV_AUTH_USER" AUTHELIA_ADMIN_EMAIL="$ENV_AUTH_EMAIL" AUTHELIA_ADMIN_PASSWORD="$ENV_AUTH_PW" \
 NTFY_ADMIN_PASSWORD="$ENV_NTFY_ADMIN" NTFY_ALERTMANAGER_PASSWORD="$ENV_NTFY_ALERT" \
 IMMICH_DB_PASSWORD="$ENV_IMMICH_DB" IMMICH_JWT_SECRET="$ENV_IMMICH_JWT" \
-PAPERLESS_SECRET_KEY="$ENV_PAPERLESS_SECRET" \
+PAPERLESS_SECRET_KEY="$ENV_PAPERLESS_SECRET" PAPERLESS_REDIS_PASSWORD="$ENV_PAPERLESS_REDIS" \
 OPENCLOUD_ADMIN_PASSWORD="$ENV_OPENCLOUD_ADMIN" RADICALE_PASSWORD="$ENV_RADICALE_PW" \
 COLLABORA_ADMIN_PASSWORD="$ENV_COLLABORA_ADMIN" \
 GRAFANA_ADMIN_PASSWORD="$ENV_GRAFANA_ADMIN" GRAFANA_SECRET_KEY="$ENV_GRAFANA_SECRET" \
@@ -364,7 +387,7 @@ keys = [
     'AUTHELIA_ADMIN_USER', 'AUTHELIA_ADMIN_EMAIL', 'AUTHELIA_ADMIN_PASSWORD',
     'NTFY_ADMIN_PASSWORD', 'NTFY_ALERTMANAGER_PASSWORD',
     'IMMICH_DB_PASSWORD', 'IMMICH_JWT_SECRET',
-    'PAPERLESS_SECRET_KEY',
+    'PAPERLESS_SECRET_KEY', 'PAPERLESS_REDIS_PASSWORD',
     'OPENCLOUD_ADMIN_PASSWORD',
     'RADICALE_PASSWORD',
     'COLLABORA_ADMIN_PASSWORD',

@@ -30,13 +30,16 @@ services:
       # Nur X_AUTHELIA_* und nicht-AUTHELIA_*-Variablen: alles mit AUTHELIA_-Präfix
       # versucht Authelia auf einen Config-Key zu mappen ("not expected"-Warnung).
       DOMAIN: ${DOMAIN}
-      TOR_DOMAIN: ${TOR_DOMAIN:-}
       AUTH_SUBDOMAIN: ${AUTHELIA_SUBDOMAIN:-auth}
       GRAFANA_SUBDOMAIN: ${GRAFANA_SUBDOMAIN:-grafana}
       IMMICH_SUBDOMAIN: ${IMMICH_SUBDOMAIN:-photos}
       HOMEPAGE_SUBDOMAIN: ${HOMEPAGE_SUBDOMAIN:-dashboard}
       OPENSPEEDTEST_SUBDOMAIN: ${OPENSPEEDTEST_SUBDOMAIN:-speedtest}
       BICHON_SUBDOMAIN: ${BICHON_SUBDOMAIN:-bichon}
+      # Ohne diese Variable stand die Grocy-Regel in der ACL hart auf
+      # "grocy.<domain>", während der Router ${GROCY_SUBDOMAIN} benutzt: bei
+      # geändertem Subdomain-Namen griff default_policy: deny und Grocy war dicht.
+      GROCY_SUBDOMAIN: ${GROCY_SUBDOMAIN:-grocy}
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
@@ -59,10 +62,6 @@ services:
       - "traefik.http.routers.authelia.entrypoints=websecure"
       - "traefik.http.services.authelia.loadbalancer.server.port=9091"
       - "traefik.http.routers.authelia.middlewares=security-headers@file,compress@file"
-      - "traefik.http.routers.authelia-tor.rule=HostRegexp(`^${AUTHELIA_SUBDOMAIN:-auth}\\.[a-z2-7]{16,56}\\.onion`)"
-      - "traefik.http.routers.authelia-tor.entrypoints=tor-http"
-      - "traefik.http.routers.authelia-tor.service=authelia"
-      - "traefik.http.routers.authelia-tor.middlewares=tor-headers@file,compress@file"
       - "homepage.group=Infrastruktur"
       - "homepage.name=Authelia"
       - "homepage.icon=authelia.png"

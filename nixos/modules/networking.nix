@@ -44,10 +44,15 @@
       # Alles wird geblockt, nur explizit erlaubte Verbindungen werden zugelassen
 
       table inet filter {
-        # Verbindungen von Docker-Netzwerken erlauben (für Container-Kommunikation)
+        # Container -> HOST. Bewusst KEIN pauschales "accept" für das Docker-
+        # Subnetz und erst recht keins für 192.168.0.0/16 (darin liegt der Host
+        # selbst -> das hob die komplette Default-Deny-Policy für das ganze LAN
+        # auf). Erlaubt sind nur die Ports, die Container am Host tatsächlich
+        # brauchen; beides scrapt Prometheus über die docker0-Gateway-IP
+        # 172.17.0.1 (siehe config/prometheus/prometheus.yml).
         chain docker_input {
-          ip saddr 172.16.0.0/12 accept
-          ip saddr 192.168.0.0/16 accept
+          ip saddr 172.16.0.0/12 tcp dport 9100 accept  # node-exporter (network_mode: host)
+          ip saddr 172.16.0.0/12 tcp dport 9323 accept  # Docker-Daemon-Metrics
         }
 
         chain input {
@@ -105,7 +110,14 @@
 
           # Docker-Bridge zu außen (NAT/Masquerade läuft in nat-Table)
           ip saddr 172.16.0.0/12 accept
-          ip saddr 192.168.0.0/16 accept
+
+          # LAN -> Container NUR über von Docker veröffentlichte Ports (80/443
+          # an Traefik). "ct status dnat" trifft genau die Pakete, die Docker
+          # per Port-Publishing umgeschrieben hat. Ein pauschales
+          # "ip saddr 192.168.0.0/16 accept" würde dagegen jedem LAN-Gerät
+          # erlauben, mit einer statischen Route nach 172.23.0.0/16 direkt mit
+          # jedem Container zu sprechen – an Traefik und Authelia vorbei.
+          ct status dnat accept
         }
 
         # Output ist frei
@@ -118,8 +130,11 @@
         chain postrouting {
           type nat hook postrouting priority srcnat; policy accept;
 
+          # Nur Container-Egress maskieren. LAN-Quellen hier zu maskieren war
+          # unnötig (der Host ist Gateway der Container, Antworten finden ihren
+          # Weg auch ohne NAT zurück) und machte die VM zum offenen Router in
+          # die Docker-Netze.
           ip saddr 172.16.0.0/12 masquerade
-          ip saddr 192.168.0.0/16 masquerade
         }
       }
     '';

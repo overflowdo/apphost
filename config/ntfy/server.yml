@@ -1,5 +1,5 @@
 # Ntfy Server-Konfiguration
-cache-file: /var/lib/ntfy/cache.db"
+cache-file: /var/lib/ntfy/cache.db
 # Authentifizierung
 auth-file: /var/lib/ntfy/users.db
 auth-default-access: deny-all

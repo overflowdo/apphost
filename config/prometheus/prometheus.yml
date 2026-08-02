@@ -3,9 +3,12 @@ global:
   scrape_interval: 60s # Wie oft Metriken gesammelt werden
   evaluation_interval: 60s # Wie oft Regeln ausgewertet werden
   scrape_timeout: 10s
-  # Labels die allen Metriken hinzugefügt werden
+  # Labels die allen Metriken hinzugefügt werden.
+  # Bewusst literal: Prometheus expandiert Umgebungsvariablen in external_labels
+  # nur mit --enable-feature=expand-external-labels. Ohne das stand hier bisher
+  # wortwörtlich der String "${HOSTNAME}" als Instanz-Label.
   external_labels:
-    instance: "${HOSTNAME}"
+    instance: "apphost"
 # Alertmanager-Anbindung
 alerting:
   alertmanagers:

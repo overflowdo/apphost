@@ -20,9 +20,8 @@
 11. [Passwörter ändern](#11-passwörter-ändern)
 12. [AIDE Integritätsprüfung](#12-aide-integritätsprüfung)
 13. [Container-Sicherheitsbericht](#13-container-sicherheitsbericht)
-14. [Tor-Onion-Adresse anzeigen](#14-tor-onion-adresse-anzeigen)
-15. [Automatische Container-Updates mit RenovateBot](#15-automatische-container-updates-mit-renovatebot)
-16. [Proxmox-Backups einrichten](#16-proxmox-backups-einrichten)
+14. [Automatische Container-Updates mit RenovateBot](#14-automatische-container-updates-mit-renovatebot)
+15. [Proxmox-Backups einrichten](#15-proxmox-backups-einrichten)
 
 **Anhang**
 
@@ -253,10 +252,12 @@ Bitte 'ja' eingeben um fortzufahren:
 Direkt danach fragt das Skript, ob die Root-Partition zusätzlich mit LUKS2 verschlüsselt werden soll:
 
 ```
-Festplattenverschlüsselung aktivieren? [j/N]:
+Festplattenverschlüsselung aktivieren? [J/n]:
 ```
 
-Standardmäßig ist die Verschlüsselung **aus** (Antwort einfach mit Enter überspringen). Bei `j`/`ja` wird direkt im Anschluss eine Passphrase für die Formatierung festgelegt.
+Standardmäßig ist die Verschlüsselung **an** (Antwort einfach mit Enter bestätigen); direkt im Anschluss wird eine Passphrase für die Formatierung festgelegt. Mit `n`/`nein` wird sie abgeschaltet.
+
+Hintergrund: Ohne Verschlüsselung liegen alle Klartext-Zugangsdaten unverschlüsselt auf der Platte – `.env` (die Quelle des `secrets`-Alias), `secrets/radicale_password.txt` und `secrets/vaultwarden_admin_token.txt`. Wer die Platte oder das Proxmox-Disk-Image in die Hand bekommt, hat damit sämtliche Passwörter des Stacks.
 
 > [!WARNING]
 > Eine verschlüsselte Root-Partition muss bei **jedem** Boot mit dieser Passphrase über die Server-Konsole (z.B. die Proxmox-Konsole) entsperrt werden. Automatische Neustarts, etwa nach Kernel-Updates, bleiben dann so lange stehen, bis die Passphrase eingegeben wurde. Wer keinen regelmäßigen Konsolenzugriff hat, sollte die Verschlüsselung deaktiviert lassen.
@@ -402,16 +403,6 @@ cd /opt/monorepo/apphost
 docker compose up -d
 ```
 
-### Tor-Adresse eintragen
-
-Nach dem ersten Start die Onion-Adresse ermitteln und in die `.env` eintragen, damit alle Dienste sie kennen:
-
-```bash
-bash scripts/show-onion-address.sh
-vim .env        # TOR_DOMAIN=<adresse>.onion eintragen
-docker compose up -d
-```
-
 ### OIDC-Clients einrichten
 
 `scripts/update-secrets-authelia.sh` (läuft automatisch im Installationsskript, siehe [Abschnitt 6](#6-installation)) richtet Authelia [[10]](#quelle-10) als zentralen SSO/OIDC-Provider ein. Danach sind noch ein paar Schritte nötig, damit die einzelnen Dienste die neuen Secrets übernehmen bzw. sich gegen Authelia registrieren:
@@ -479,16 +470,14 @@ Produkte gruppieren (z. B. verschiedene Tomatensoßen) – kein Flag nötig, ein
 
 ## 9. AIDE initialisieren
 
-AIDE (Advanced Intrusion Detection Environment) [[12]](#quelle-12) überwacht die Integrität des Dateisystems und erkennt unbefugte Änderungen. Direkt nach der Installation wird die Referenzdatenbank einmalig angelegt.
+AIDE (Advanced Intrusion Detection Environment) [[12]](#quelle-12) überwacht die Integrität des Dateisystems und erkennt unbefugte Änderungen.
 
-1. Datenbank initialisieren:
-   ```bash
-   aide --init && cp /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-   ```
-2. Erste Integritätsprüfung ausführen:
-   ```bash
-   aide --check
-   ```
+Die Referenzdatenbank wird **automatisch** angelegt: Der systemd-Service `aide-check` legt beim ersten Lauf die Baseline an und prüft ab dem zweiten Lauf gegen sie. Wer nicht bis zum nächsten Timer warten will, stößt ihn direkt an:
+
+```bash
+sudo systemctl start aide-check
+journalctl -u aide-check -n 50 --no-pager
+```
 
 Die laufende Überwachung im Betrieb ist in [Abschnitt 12](#12-aide-integritätsprüfung) beschrieben.
 
@@ -563,7 +552,7 @@ aide --check
 > Nach legitimen Systemänderungen (z.B. einem größeren Update) sollte die Referenzdatenbank neu erstellt werden, damit die täglichen Prüfungen keine Fehlalarme melden:
 >
 > ```bash
-> aide --init && cp /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+> sudo rm /var/lib/aide/aide.db && sudo systemctl start aide-check
 > ```
 
 ---
@@ -578,30 +567,7 @@ less /var/log/docker-security-scan.log
 
 ---
 
-## 14. Tor-Onion-Adresse anzeigen
-
-Die `.onion`-Adresse (Onion Service v3 [[15]](#quelle-15)) wird beim ersten Start des Tor-Containers automatisch generiert und ist persistent. Sie kann jederzeit angezeigt werden:
-
-```bash
-bash /opt/monorepo/apphost/scripts/show-onion-address.sh
-```
-
-Beispielausgabe:
-
-```
-Tor Onion-Adresse (Hidden Service v3)
-https://<26-stellige-adresse>.onion
-```
-
-> [!NOTE]
-> Alle Dienste sind unter `<subdomain>.<onion-adresse>` erreichbar, z.B. `dashboard.<adresse>.onion`. Der Tor-Browser-Hinweis auf das selbstsignierte Zertifikat ist normal: Tor erzeugt kein öffentlich vertrauenswürdiges TLS-Zertifikat, da die Onion-Kommunikation bereits Ende-zu-Ende verschlüsselt ist.
->
-> Die Adresse muss nach der Erstinstallation in die `.env`-Datei eingetragen werden:
-> `TOR_DOMAIN=<adresse>.onion`
-
----
-
-## 15. Automatische Container-Updates mit RenovateBot
+## 14. Automatische Container-Updates mit RenovateBot
 
 Alle Container-Image-Updates erfolgen automatisiert über RenovateBot [[14]](#quelle-14) direkt im GitHub-Repository. Es ist keine manuelle Versionspflege erforderlich.
 
@@ -621,7 +587,7 @@ RenovateBot überwacht kontinuierlich das Repository und erkennt neue Versionen 
 
 ---
 
-## 16. Proxmox-Backups einrichten
+## 15. Proxmox-Backups einrichten
 
 Damit die komplette `apphost`-VM im Notfall wiederhergestellt werden kann, sollten regelmäßige Backups auf Ebene von Proxmox eingerichtet werden [[2]](#quelle-2). Proxmox bringt dafür ein eigenes Werkzeug mit, das sich vollständig über die Weboberfläche steuern lässt. Es sichert die komplette VM (also Festplatten, Konfiguration, TPM, etc.), nicht nur einzelne Dateien.
 
@@ -680,4 +646,3 @@ Im Fließtext wird mit `[[n]]` auf die folgenden externen Quellen verwiesen. Die
 12. <a id="quelle-12"></a>AIDE Project: _Advanced Intrusion Detection Environment_. https://aide.github.io/ (`aide_project`)
 13. <a id="quelle-13"></a>Aqua Security: _Trivy Documentation_. https://trivy.dev/ (`trivy_docs`)
 14. <a id="quelle-14"></a>Mend.io: _RenovateBot Documentation_. https://docs.renovatebot.com/ (`renovatebot_docs`)
-15. <a id="quelle-15"></a>The Tor Project: _Onion Services_. https://community.torproject.org/onion-services/ (`tor_onion_services`)

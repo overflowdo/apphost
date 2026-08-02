@@ -23,7 +23,22 @@ services:
       password: ${COLLABORA_ADMIN_PASSWORD:?}
     volumes:
       - /run/current-system/sw/share/X11/fonts/:/usr/share/fonts/truetype/more:ro
-    cap_add: [SYS_ADMIN]
+    # Collabora sandboxt jeden Dokument-Prozess SELBST (eigene Mount-/PID-
+    # Namespaces + chroot pro Dokument) und braucht dafür SYS_ADMIN, SYS_CHROOT
+    # und MKNOD. Vorher stand hier nur "cap_add: [SYS_ADMIN]" OHNE cap_drop –
+    # der Container hatte also zusätzlich den kompletten Docker-Default-Satz
+    # (NET_RAW, NET_BIND_SERVICE, KILL, AUDIT_WRITE, …). Jetzt: alles weg,
+    # nur das Nötige zurück.
+    cap_drop: [ALL]
+    cap_add: [SYS_ADMIN, SYS_CHROOT, MKNOD, CHOWN, FOWNER, SETGID, SETUID, DAC_OVERRIDE]
+    # seccomp/apparmor bleiben unconfined: die Default-Profile blockieren genau
+    # die mount()/clone()-Aufrufe, mit denen Collabora seine eigene Sandbox baut.
+    # KEIN no-new-privileges: coolwsd erteilt seinen Hilfsprozessen (coolforkit)
+    # Datei-Capabilities; mit NNP schlägt das fehl und der Editor startet nicht.
+    # Damit ist das hier weiterhin der am schwächsten isolierte Container im
+    # Stack – er hängt in traefik-public, also im selben Netz wie alle anderen
+    # Web-Dienste. Wer das enger haben will, muss ihn in ein eigenes Netz legen
+    # (nur wopiserver/opencloud + traefik dürfen ihn erreichen).
     security_opt:
       - seccomp=unconfined
       - apparmor:unconfined
@@ -49,3 +64,24 @@ services:
       - "traefik.http.routers.collabora.rule=Host(`${COLLABORA_SUBDOMAIN:-office}.${DOMAIN}`)"
       - "traefik.http.routers.collabora.entrypoints=websecure"
       - "traefik.http.services.collabora.loadbalancer.server.port=9980"
+      # Eigene Header-Middleware statt default-chain@file. Collabora war bislang
+      # der einzige Dienst ganz OHNE Middleware -> kein HSTS, kein nosniff, keine
+      # Referrer-Policy. default-chain geht hier aber nicht: security-headers
+      # setzt X-Frame-Options und COEP: require-corp, und OpenCloud bindet
+      # office.<domain> als CROSS-ORIGIN-Iframe ein (cloud.<domain>) – beides
+      # würde den Editor blockieren. Frame-Schutz übernimmt stattdessen die von
+      # Collabora selbst gesetzte CSP (--o:net.frame_ancestors, siehe oben).
+      # Als Docker-Label (nicht in dynamic/middlewares.yml), weil dort ${DOMAIN}
+      # nicht interpoliert wird.
+      - "traefik.http.middlewares.collabora-headers.headers.stsSeconds=63072000"
+      - "traefik.http.middlewares.collabora-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.collabora-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.collabora-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.collabora-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.collabora-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.collabora-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.collabora-headers.headers.customResponseHeaders.X-Robots-Tag=noindex, nofollow, noarchive"
+      - "traefik.http.middlewares.collabora-headers.headers.customResponseHeaders.Server="
+      - "traefik.http.middlewares.collabora-headers.headers.customResponseHeaders.X-Powered-By="
+      - "traefik.http.middlewares.collabora-headers.headers.customRequestHeaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.collabora.middlewares=collabora-headers,compress@file"

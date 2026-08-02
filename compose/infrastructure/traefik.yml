@@ -98,6 +98,9 @@ services:
       - ../../config/traefik:/etc/traefik:ro
       # Lokale CA + Server-Zertifikat (von nixos/modules/local-ca.nix erzeugt)
       - /var/lib/apphost-ca:/certs-local:ro
+      # Access-Log als Datei – Quelle für das fail2ban-Jail "traefik-auth".
+      # Verzeichnis + Ownership legt nixos/modules/docker.nix an (tmpfiles).
+      - /var/log/traefik:/var/log/traefik
     environment:
       TZ: Europe/Berlin
       # Hetzner:
@@ -135,10 +138,6 @@ services:
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.traefik.middlewares=authelia-chain@file"
-      - "traefik.http.routers.traefik-tor.rule=HostRegexp(`^traefik\\.[a-z2-7]{16,56}\\.onion`)"
-      - "traefik.http.routers.traefik-tor.entrypoints=tor-http"
-      - "traefik.http.routers.traefik-tor.service=api@internal"
-      - "traefik.http.routers.traefik-tor.middlewares=tor-authelia-chain@file"
       - "homepage.group=Infrastruktur"
       - "homepage.name=Traefik"
       - "homepage.icon=traefik.png"

@@ -14,6 +14,9 @@ services:
     volumes:
       - alertmanager_data:/alertmanager
       - ../../config/alertmanager:/etc/alertmanager:ro
+      # ntfy-Passwort für die Webhook-Receiver (config/alertmanager/config.yml
+      # -> basic_auth.password_file). Erzeugt von scripts/update-secrets-ntfy.sh.
+      - ../../secrets/alertmanager_ntfy_password:/run/secrets/ntfy_password:ro
     command:
       - "--config.file=/etc/alertmanager/config.yml"
       - "--storage.path=/alertmanager"
@@ -38,7 +41,3 @@ services:
       - "traefik.http.routers.alertmanager.entrypoints=websecure"
       - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
       - "traefik.http.routers.alertmanager.middlewares=authelia-chain@file"
-      - "traefik.http.routers.alertmanager-tor.rule=HostRegexp(`^alertmanager\\.[a-z2-7]{16,56}\\.onion`)"
-      - "traefik.http.routers.alertmanager-tor.entrypoints=tor-http"
-      - "traefik.http.routers.alertmanager-tor.service=alertmanager"
-      - "traefik.http.routers.alertmanager-tor.middlewares=tor-authelia-chain@file"
