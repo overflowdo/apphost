@@ -341,10 +341,15 @@ Authelia Admin-Nutzer [admin]:
 Authelia Admin-E-Mail [<ACME E-Mail>]:
 Authelia Admin-Passwort:
 Authelia Admin-Passwort (bestätigen):
+ntfy Admin-Passwort (leer = zufällig):
+OpenCloud Admin-Passwort (leer = zufällig):
+Grafana Admin-Passwort (leer = zufällig):
+Radicale/Kalender-Passwort (DAVx5 am Handy) (leer = zufällig):
+Vaultwarden /admin-Token (leer = zufällig):
 ```
 
 > [!NOTE]
-> **Ntfy-Passwörter werden automatisch als zufällige Zeichenketten generiert**, dafür ist keine Eingabe nötig. Alle Werte – auch die hier abgefragten – können jederzeit nachträglich in `/opt/monorepo/apphost/.env` angepasst werden, siehe [Abschnitt 11](#11-passwörter-ändern).
+> **Für die Dienste, in die du dich selbst einloggst** (Authelia, ntfy, OpenCloud, Grafana, Radicale, Vaultwarden), kannst du direkt ein eigenes, merkbares Passwort vergeben – oder **Enter drücken für ein zufälliges** (empfehlenswert für alles, was du nicht am Handy tippst). Rein interne Secrets (DB, JWT, Paperless, Collabora …) werden immer automatisch generiert. Alle Werte lassen sich jederzeit nachträglich in `/opt/monorepo/.env` ändern, siehe [Abschnitt 11](#11-passwörter-ändern).
 
 Anschließend generiert das Skript die Secrets für Authelia und Ntfy und startet automatisch neu.
 
