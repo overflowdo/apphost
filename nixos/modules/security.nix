@@ -151,8 +151,8 @@
 
   # AIDE – File Integrity Monitoring
   # Manuelle Ausführung: aide --check
-  # Die Datenbank legt der aide-check-Dienst unten beim ersten Lauf selbst an.
-  # Nach beabsichtigten Systemänderungen neu einlesen:
+  # Die Datenbank legt der aide-check-Dienst unten beim ersten Lauf selbst an
+  # und zieht sie nach jedem nixos-rebuild automatisch neu. Manuell erzwingen:
   #   sudo rm /var/lib/aide/aide.db && sudo systemctl start aide-check
   environment.etc."aide.conf".text = ''
     database_in=file:/var/lib/aide/aide.db
@@ -164,19 +164,22 @@
 
     # tiger, haval und gost sind in aktuellen AIDE-Versionen entfernt – standen
     # sie hier drin, ließ sich die Konfiguration gar nicht erst parsen und der
-    # Check lief nie. Übrig bleiben die tatsächlich verfügbaren Hashes plus die
-    # üblichen Metadaten-Attribute (Rechte, Inode, Owner, Größe, mtime/ctime).
-    NORMAL = p+i+n+u+g+s+m+c+sha512+sha256+rmd160+crc32
+    # Check lief nie. rmd160 und crc32 hängen davon ab, gegen welche
+    # Krypto-Bibliothek nixpkgs AIDE baut, und sind hier bewusst NICHT drin:
+    # sha512+sha256 sind immer vorhanden und reichen völlig. Dazu die
+    # üblichen Metadaten (Rechte, Inode, Links, Owner, Größe, mtime/ctime).
+    NORMAL = p+i+n+u+g+s+m+c+sha512+sha256
 
-    /etc NORMAL
-    /bin NORMAL
-    /sbin NORMAL
-    /lib NORMAL
-    /lib64 NORMAL
-    /usr/bin NORMAL
-    /usr/sbin NORMAL
+    # Überwachte Pfade. /bin, /sbin, /lib, /lib64, /usr/bin und /usr/sbin sind
+    # hier RAUS: auf NixOS gibt es sie nicht bzw. nur als einzelne Symlinks
+    # (/bin/sh, /usr/bin/env) – AIDE meldete sie schlicht als fehlend.
+    # Alles Ausführbare liegt im /nix/store und ist dort ohnehin
+    # hash-adressiert und read-only.
     /boot NORMAL
+    /etc NORMAL
     /opt/monorepo/config NORMAL
+    /root NORMAL
+    /home/apphost/.ssh NORMAL
 
     !/proc
     !/sys
@@ -184,6 +187,10 @@
     !/run
     !/tmp
     !/var/tmp
+    # /etc besteht auf NixOS größtenteils aus Symlinks in den Store; diese
+    # beiden Dateien schreibt das System selbst bei jedem Boot neu.
+    !/etc/resolv.conf
+    !/etc/machine-id
   '';
 
   systemd.services.aide-check = {
@@ -191,16 +198,36 @@
     startAt     = "daily";
     # Die Datenbank wurde nirgends initialisiert -> der Dienst gab jeden Tag nur
     # den Hinweis "Datenbank nicht gefunden" aus und hat nie geprüft. Jetzt legt
-    # er sie beim ersten Lauf selbst an (Baseline) und prüft ab dem zweiten Lauf.
+    # er sie beim ersten Lauf selbst an.
+    #
+    # Zweite Baustelle: /etc besteht auf NixOS fast vollständig aus Symlinks in
+    # den Nix-Store und wird bei JEDEM `nixos-rebuild switch` komplett neu
+    # verlinkt. Ohne Gegenmaßnahme meldet der tägliche Report danach hunderte
+    # Änderungen – reines Rauschen, in dem ein echter Treffer untergeht. Deshalb
+    # merkt sich der Dienst die System-Generation: ändert sie sich, wird die
+    # Baseline EINMAL neu gezogen statt einen Report zu erzeugen. Zwischen zwei
+    # Rebuilds ist jede Abweichung dann eine echte.
     script      = ''
       set -u
       mkdir -p /var/lib/aide
 
+      GEN="$(readlink -f /run/current-system)"
+      STAMP=/var/lib/aide/system-generation
+
       if [ ! -f /var/lib/aide/aide.db ]; then
-        echo "AIDE: keine Datenbank vorhanden -> lege Baseline an (aide --init)."
+        REASON="keine Datenbank vorhanden"
+      elif [ "$(cat "$STAMP" 2>/dev/null || echo none)" != "$GEN" ]; then
+        REASON="System-Generation geändert (nixos-rebuild)"
+      else
+        REASON=""
+      fi
+
+      if [ -n "$REASON" ]; then
+        echo "AIDE: $REASON -> Baseline wird neu erstellt (aide --init)."
         ${pkgs.aide}/bin/aide --init
         mv -f /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-        echo "AIDE: Baseline erstellt. Ab dem nächsten Lauf wird geprüft."
+        printf '%s' "$GEN" > "$STAMP"
+        echo "AIDE: Baseline erstellt. Ab dem nächsten Lauf wird wieder geprüft."
         exit 0
       fi
 
