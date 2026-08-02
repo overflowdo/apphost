@@ -95,6 +95,26 @@ loki.source.file "auth" {
   forward_to = [loki.write.loki.receiver]
 }
 
+// Traefik-Access-Log.
+// Seit accessLog.filePath gesetzt ist (nötig für das fail2ban-Jail traefik-auth),
+// schreibt Traefik die Zugriffe NUR NOCH in die Datei und nicht mehr nach stdout.
+// Über den Container-Log-Weg kamen sie damit nicht mehr in Loki an. Alloy mountet
+// /var/log ohnehin read-only, also von dort direkt einlesen.
+// Die Grafana-Dashboards sind davon unabhängig (die nutzen
+// traefik_service_requests_total aus Prometheus), im Log-Explorer fehlten sie aber.
+local.file_match "traefik_access" {
+  path_targets = [{
+    __path__ = "/var/log/traefik/access.log",
+    job      = "traefik-access",
+    host     = "apphost",
+  }]
+}
+
+loki.source.file "traefik_access" {
+  targets    = local.file_match.traefik_access.targets
+  forward_to = [loki.write.loki.receiver]
+}
+
 loki.write "loki" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
