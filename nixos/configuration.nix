@@ -9,6 +9,7 @@
     ./modules/media-disk.nix
     ./modules/media-dirs.nix
     ./modules/local-ca.nix
+    ./modules/backup.nix
   ];
 
   # System
@@ -306,7 +307,10 @@
     # nacheinander, mit Health-Wait dazwischen), damit nicht alle gleichzeitig
     # auf die USB-Platte schreiben + RAM spiken. "up-all" = alles auf einmal.
     up     = "cd /opt/monorepo && bash scripts/stack-up.sh";
-    up-all = "cd /opt/monorepo && docker compose up -d";
+    # ensure-secrets.sh auch hier: fehlt eine der acht per Bind-Mount
+    # eingehängten Secret-Dateien, legt Docker an ihrer Stelle ein Verzeichnis
+    # an und der betroffene Container startet stillschweigend kaputt.
+    up-all = "cd /opt/monorepo && bash scripts/ensure-secrets.sh && docker compose up -d";
     down   = "cd /opt/monorepo && docker compose down";
     logs = "cd /opt/monorepo && docker compose logs -f";
 
@@ -316,6 +320,10 @@
 
     # Alle Passwörter/Tokens (aus .env + secrets/) an einem Ort anzeigen
     secrets = "cd /opt/monorepo && bash scripts/show-secrets.sh";
+
+    # Datenbank-Dumps von Hand ziehen (läuft sonst täglich 02:30 per Timer).
+    # Der Proxmox-Snapshot allein ist nur crash-, nicht anwendungskonsistent.
+    backup-db = "sudo bash /opt/monorepo/scripts/backup-databases.sh";
 
     # Übersicht aller Verwaltungsbefehle
     help = "bash /opt/monorepo/scripts/help.sh";

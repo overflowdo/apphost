@@ -442,6 +442,21 @@ docker compose up -d
 > [!NOTE]
 > **Passwörter ändern:** Nach Änderungen an Passwörtern in der `.env` müssen die Secrets neu generiert und der Stack neu gestartet werden. Details siehe [Abschnitt 11](#11-passwörter-ändern).
 
+### Zweiter Faktor für die Admin-Oberflächen
+
+Die drei Infrastruktur-Oberflächen **Traefik-Dashboard**, **Prometheus** und **Alertmanager** stehen in `config/authelia/configuration.yml` auf `two_factor` – wer dort hineinkommt, sieht bzw. verändert die komplette Infrastruktur. Alle übrigen Dienste bleiben bei `one_factor`.
+
+Beim **ersten** Aufruf einer dieser drei Adressen verlangt Authelia deshalb die Registrierung eines zweiten Faktors (TOTP-App oder WebAuthn/Passkey). Authelia verschickt dafür einen Bestätigungslink – allerdings nicht per Mail, sondern über den `filesystem`-Notifier in eine Datei im Container. Der Link wird so ausgelesen:
+
+```bash
+docker exec authelia cat /data/notification.txt
+```
+
+Die letzte URL in der Datei im Browser öffnen, den Faktor registrieren (TOTP: QR-Code mit einer Authenticator-App scannen), danach funktioniert der Login normal.
+
+> [!NOTE]
+> Ohne diesen Schritt bleibt man vor einer Aufforderung stehen, die sich nicht erfüllen lässt. Wer keinen zweiten Faktor möchte, setzt die drei Domains in `config/authelia/configuration.yml` zurück auf `policy: one_factor` und startet Authelia neu (`docker compose up -d --force-recreate authelia`).
+
 ### Kalender (Radicale) & Vorratsverwaltung (Grocy)
 
 **Radicale (CalDAV/CardDAV)** läuft mit eigener Basic-Auth – bewusst **nicht** hinter Authelia, weil DAVx5 kein Browser-SSO macht. Zugangsdaten anzeigen:
@@ -507,13 +522,14 @@ Für häufige Verwaltungsaufgaben sind Shell-Aliase definiert, die nach dem Logi
 | Alias           | Beschreibung                                                        |
 | --------------- | ------------------------------------------------------------------- |
 | `up`            | Stack **gestaffelt** starten: erzeugt fehlende Secrets und fährt die USB-/RAM-schweren Dienste nacheinander hoch (`scripts/stack-up.sh`) |
-| `up-all`        | Alle Container **auf einmal** starten (`docker compose up -d`) – Notnagel |
+| `up-all`        | Alle Container **auf einmal** starten – erzeugt vorher ebenfalls fehlende Secrets (`scripts/ensure-secrets.sh`), dann `docker compose up -d`. Notnagel |
 | `down`          | Alle Container stoppen                                              |
 | `logs`          | Log-Stream aller Container (`docker compose logs -f`)               |
 | `status`        | Docker-Daemon-Status und laufende Container (`docker ps`)           |
 | `secrets`       | Alle Passwörter/Tokens (aus `.env` + `secrets/`) an einem Ort anzeigen |
 | `regen-secrets` | Alle Secrets neu generieren (nach Passwortänderungen in der `.env`) |
 | `ca`            | Lokales CA-Zertifikat ausgeben (zum Import in Browser/Handy)         |
+| `backup-db`     | Anwendungskonsistente Datenbank-Dumps nach `/var/backups/apphost` ziehen (läuft sonst täglich 02:30) |
 | `help`          | Übersicht aller Verwaltungsbefehle                                  |
 
 Nach dem Mergen eines RenovateBot-PRs genügt `up`, um die aktualisierten Images zu ziehen und die Container neu zu starten.
@@ -549,7 +565,9 @@ aide --check
 ```
 
 > [!NOTE]
-> Nach legitimen Systemänderungen (z.B. einem größeren Update) sollte die Referenzdatenbank neu erstellt werden, damit die täglichen Prüfungen keine Fehlalarme melden:
+> Nach einem `nixos-rebuild` zieht der Dienst die Referenzdatenbank **automatisch** neu: `/etc` besteht auf NixOS fast vollständig aus Symlinks in den Nix-Store und wird bei jedem Rebuild neu verlinkt – ohne das wäre der tägliche Report danach reines Rauschen. Dafür merkt sich der Dienst die aktive System-Generation. Zwischen zwei Rebuilds ist jede gemeldete Abweichung also eine echte.
+>
+> Von Hand erzwingen lässt sich die Neu-Baseline so:
 >
 > ```bash
 > sudo rm /var/lib/aide/aide.db && sudo systemctl start aide-check
@@ -590,6 +608,33 @@ RenovateBot überwacht kontinuierlich das Repository und erkennt neue Versionen 
 ## 15. Proxmox-Backups einrichten
 
 Damit die komplette `apphost`-VM im Notfall wiederhergestellt werden kann, sollten regelmäßige Backups auf Ebene von Proxmox eingerichtet werden [[2]](#quelle-2). Proxmox bringt dafür ein eigenes Werkzeug mit, das sich vollständig über die Weboberfläche steuern lässt. Es sichert die komplette VM (also Festplatten, Konfiguration, TPM, etc.), nicht nur einzelne Dateien.
+
+### Datenbank-Dumps (läuft automatisch)
+
+Ein VM-Snapshot ist **crash-konsistent**: Er hält den Zustand der Blockgeräte fest, nicht den der Anwendungen. Für die Postgres-Datenbank von Immich und die SQLite-Datenbanken von Authelia, Grafana, Vaultwarden und Paperless heißt das, dass der Snapshot eine Datei mitten in einer Transaktion erwischen kann – beim Zurückspielen ist das im besten Fall eine Recovery, im schlechtesten eine korrupte Datei.
+
+Deshalb legt der systemd-Timer `apphost-db-backup` täglich um **02:30** saubere Dumps unter `/var/backups/apphost` ab (`pg_dump` für Postgres, die SQLite-Online-Backup-API für den Rest). Die liegen dort als normale Dateien und werden vom Proxmox-Snapshot einfach mitgesichert. Aufbewahrt werden 14 Tage.
+
+```bash
+backup-db                                   # von Hand anstoßen
+systemctl status apphost-db-backup          # letzter Lauf
+ls -lh /var/backups/apphost                 # vorhandene Dumps
+```
+
+Wiederherstellen (Beispiele):
+
+```bash
+# Postgres (Immich)
+gunzip -c /var/backups/apphost/immich-postgres_<stamp>.sql.gz \
+  | docker exec -i immich-postgres psql -U immich -d immich
+
+# SQLite (hier Vaultwarden) – Container vorher stoppen
+docker compose stop vaultwarden
+gunzip -c /var/backups/apphost/vaultwarden_<stamp>.sqlite.gz \
+  > "$(docker volume inspect -f '{{.Mountpoint}}' apphost_vaultwarden_data)/db.sqlite3"
+docker compose start vaultwarden
+```
+
 
 ### Backup-Speicher festlegen
 

@@ -46,6 +46,12 @@ services:
       EVENTS: 1
       PING: 1
       VERSION: 1
+      # INFO (GET /info) braucht cAdvisor beim Registrieren seiner Docker-Factory.
+      # Ohne das antwortet der Proxy mit 403, cAdvisor läuft zwar weiter, aber ohne
+      # Docker-Integration: es bleiben rohe cgroup-Metriken OHNE name= und
+      # container_label_*. Alle drei Container-Alerts filtern auf name!="" –
+      # ContainerDown (absent(...)) würde dann dauerhaft feuern.
+      INFO: 1
       POST: 0
       DELETE: 0
       PUT: 0

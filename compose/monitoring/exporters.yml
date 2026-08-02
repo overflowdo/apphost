@@ -25,6 +25,16 @@ services:
     deploy:
       resources:
         limits: {cpus: "0.5", memory: 64M}
+    # prom/node-exporter basiert auf busybox -> wget ist vorhanden.
+    # (loki ist dagegen distroless und alloy ein Ubuntu ohne wget/curl: dort ist
+    # ein exec-Healthcheck technisch unmöglich. Beide deckt stattdessen der
+    # TargetDown-Alert über die Prometheus-up-Metrik ab.)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     labels:
       - "traefik.enable=false"
   cadvisor:

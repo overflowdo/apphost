@@ -21,9 +21,6 @@
 # Generierte Secrets (Authelia, Ntfy, Vaultwarden-Token etc.) – niemals committen
 secrets/
 
-# Tor Hidden Service Keys
-config/tor/hidden_service/
-
 # Zertifikate und Schlüssel
 *.pem
 *.key
@@ -41,6 +38,15 @@ temp/
 # Backup-Dateien
 *.bak
 *.backup
+
+# Patch-/Diff-Artefakte. Landen beim Ein- und Ausspielen von Reviews im
+# Repo-Root und wurden schon mehrfach versehentlich mitcommittet
+# (0001fixdeploypaths.patch, mediadirsoneshot.patch, installpasswordprompts.patch,
+# apphostsecurityfixescombined.diff).
+*.patch
+*.diff
+*.rej
+*.orig
 
 # NixOS maschinenspezifische Dateien (von install.sh pro Installation generiert)
 hardware-configuration.nix

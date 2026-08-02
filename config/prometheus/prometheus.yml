@@ -77,6 +77,13 @@ scrape_configs:
     static_configs:
       - targets: ["loki:3100"]
     metrics_path: /metrics
+  # Alloy – bislang nicht gescrapt. Weder loki (distroless) noch alloy (Ubuntu
+  # ohne wget/curl) können einen exec-Healthcheck ausführen; über die
+  # up-Metrik greift stattdessen der TargetDown-Alert.
+  - job_name: "alloy"
+    static_configs:
+      - targets: ["alloy:12345"]
+    metrics_path: /metrics
   # Alertmanager
   - job_name: "alertmanager"
     static_configs:

@@ -42,9 +42,25 @@ groups:
           severity: warning
         annotations:
           summary: "System-Load hoch: {{ $value }}"
+  # Scrape-Targets. Deckt alles ab, was Prometheus anfasst – also auch die
+  # Dienste, denen ein Docker-Healthcheck technisch nicht möglich ist
+  # (loki = distroless, alloy = Ubuntu ohne HTTP-Client).
+  - name: targets
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus-Target nicht erreichbar: {{ $labels.job }} ({{ $labels.instance }})"
+          description: "Der Scrape schlägt seit mindestens 3 Minuten fehl."
   # Container-Alarme
   - name: containers
     rules:
+      # Setzt voraus, dass cAdvisor seine Docker-Factory registrieren konnte
+      # (socket-proxy braucht dafür INFO=1) – sonst fehlt das name-Label an
+      # allen container_*-Metriken und absent() feuert dauerhaft.
       - alert: ContainerDown
         expr: absent(container_last_seen{name!=""})
         for: 1m
@@ -77,10 +93,12 @@ groups:
           severity: warning
         annotations:
           summary: "Traefik hohe Fehlerrate: {{ $labels.router }}"
-      - alert: TraefikBackendDown
-        expr: traefik_backend_server_up == 0
+      # traefik_backend_server_up war der Metrikname aus Traefik v1 – unter v3
+      # heißt sie traefik_service_server_up. Der Alert konnte also nie feuern.
+      - alert: TraefikServiceDown
+        expr: traefik_service_server_up == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Traefik Backend nicht erreichbar: {{ $labels.backend }}"
+          summary: "Traefik Service nicht erreichbar: {{ $labels.service }}"

@@ -25,6 +25,7 @@ cat <<'EOF'
     secrets        Alle Passwörter/Tokens (aus .env + secrets/) anzeigen
     regen-secrets  Secrets neu generieren (nach Passwortänderung in .env)
     ca             Lokales CA-Zertifikat ausgeben (Import in Browser/Handy)
+    backup-db      Datenbank-Dumps nach /var/backups/apphost (täglich 02:30 automatisch)
 
     help           Diese Übersicht
 
