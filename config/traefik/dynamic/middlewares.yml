@@ -61,8 +61,9 @@ http:
           - "Remote-Groups"
           - "Remote-Name"
           - "Remote-Email"
-    # strip-remote-user entfernt vom CLIENT gesetzte Auth-Header. Apps vertrauen für den Onion-Zugriff dem
-    # Remote-User-Header daher darf er niemals vom Client kommen
+    # strip-remote-user entfernt vom CLIENT gesetzte Auth-Header. Alles, was dem
+    # Remote-User-Header vertraut (aktuell nur noch Grocy, config/grocy/config.php),
+    # darf ihn niemals vom Client bekommen – er muss aus forward-auth stammen.
     strip-remote-user:
       headers:
         customRequestHeaders:
@@ -95,25 +96,6 @@ http:
         customRequestHeaders:
           X-Forwarded-Proto: "https"
           X-Real-IP: ""
-    # Tor-Variante von opencloud-headers – ohne HSTS (analog tor-headers).
-    tor-opencloud-headers:
-      headers:
-        frameDeny: true
-        customFrameOptionsValue: "SAMEORIGIN"
-        contentTypeNosniff: true
-        browserXssFilter: true
-        referrerPolicy: "strict-origin-when-cross-origin"
-        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
-        customResponseHeaders:
-          Strict-Transport-Security: ""
-          X-Robots-Tag: "noindex, nofollow, noarchive"
-          Server: ""
-          X-Powered-By: ""
-          Cross-Origin-Opener-Policy: "same-origin"
-          Cross-Origin-Resource-Policy: "same-site"
-          X-XSS-Protection: "1; mode=block"
-        customRequestHeaders:
-          X-Real-IP: ""
     # Middleware-Ketten (kombinierte Middlewares)
     # Standard-Kette für öffentliche Services mit eigener Auth
     default-chain:
@@ -127,11 +109,6 @@ http:
         middlewares:
           - opencloud-headers
           - compress
-    tor-opencloud-chain:
-      chain:
-        middlewares:
-          - tor-opencloud-headers
-          - compress
     # Authelia-Kette – ForwardAuth für Services ohne eigenes OIDC.
     # strip-remote-user MUSS vor forward-auth stehen: es löscht client-gesetzte
     # Remote-User/-Groups/-Name/-Email-Header, danach setzt forward-auth die von
@@ -144,38 +121,4 @@ http:
           - strip-remote-user
           - forward-auth
           - security-headers
-          - compress
-    # Tor / Onion-Varianten – identisch zu oben, aber OHNE HSTS.
-    tor-headers:
-      headers:
-        # KEIN HSTS (siehe oben)
-        frameDeny: true
-        customFrameOptionsValue: "SAMEORIGIN"
-        contentTypeNosniff: true
-        browserXssFilter: true
-        referrerPolicy: "strict-origin-when-cross-origin"
-        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
-        customResponseHeaders:
-          Strict-Transport-Security: ""
-          X-Robots-Tag: "noindex, nofollow, noarchive"
-          Server: ""
-          X-Powered-By: ""
-          Cross-Origin-Opener-Policy: "same-origin"
-          Cross-Origin-Embedder-Policy: "require-corp"
-          Cross-Origin-Resource-Policy: "same-site"
-          X-XSS-Protection: "1; mode=block"
-        customRequestHeaders:
-          X-Real-IP: ""
-    tor-chain:
-      chain:
-        middlewares:
-          - tor-headers
-          - compress
-    # Onion-Authelia-Kette
-    tor-authelia-chain:
-      chain:
-        middlewares:
-          - strip-remote-user
-          - forward-auth
-          - tor-headers
           - compress

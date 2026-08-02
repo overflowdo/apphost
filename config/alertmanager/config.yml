@@ -28,6 +28,18 @@ route:
     - match:
         alertname: Watchdog
       receiver: "null"
+# HINWEIS zur Authentifizierung gegen ntfy:
+# Hier stand vorher 'bearer_token: "${NTFY_ADMIN_TOKEN}"'. Das konnte nie
+# funktionieren: Alertmanager expandiert KEINE Umgebungsvariablen in seiner
+# Konfiguration, der Token war also literal der String "${NTFY_ADMIN_TOKEN}" –
+# und NTFY_ADMIN_TOKEN war ohnehin nirgends im Repo definiert. ntfy läuft mit
+# auth-default-access: deny-all + require-login: true, jede Benachrichtigung
+# scheiterte damit still an 401/403: es kam KEIN einziger Alarm an.
+# Richtig ist Basic-Auth mit dem User, den scripts/update-secrets-ntfy.sh
+# ohnehin anlegt (inkl. ACL rw auf apphost-critical/apphost-warnings). Das
+# Passwort kommt aus secrets/alertmanager_ntfy_password (dorthin geschrieben von
+# update-secrets-ntfy.sh, gemountet nach /run/secrets/ntfy_password,
+# siehe compose/monitoring/alertmanager.yml).
 receivers:
   # Null-Receiver (für stille Alerts)
   - name: "null"
@@ -37,14 +49,18 @@ receivers:
       - url: "http://ntfy:80/apphost-critical"
         send_resolved: true
         http_config:
-          bearer_token: "${NTFY_ADMIN_TOKEN}"
+          basic_auth:
+            username: alertmanager
+            password_file: /run/secrets/ntfy_password
   # Warnungen (normale Priorität)
   - name: ntfy-warning
     webhook_configs:
       - url: "http://ntfy:80/apphost-warnings"
         send_resolved: true
         http_config:
-          bearer_token: "${NTFY_ADMIN_TOKEN}"
+          basic_auth:
+            username: alertmanager
+            password_file: /run/secrets/ntfy_password
 inhibit_rules:
   # Kritische Alerts inhibieren Warnungen des gleichen Services
   - source_match:

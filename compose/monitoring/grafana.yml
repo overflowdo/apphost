@@ -55,18 +55,14 @@ services:
       GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       GF_AUTH_BASIC_ENABLED: "false"
-      # Auth-Proxy NUR für den Onion-Zugriff: ForwardAuth (tor-authelia-chain)
-      # liefert den Remote-User-Header -> Grafana loggt den Nutzer ein.
-      # Clearnet entfernt den Header (strip-remote-user) -> dort gilt OIDC.
-      # whitelist = Traefik-IP, damit kein anderer Container den Header faken kann.
-      GF_AUTH_PROXY_ENABLED: "true"
-      GF_AUTH_PROXY_HEADER_NAME: "Remote-User"
-      GF_AUTH_PROXY_HEADER_PROPERTY: "username"
-      GF_AUTH_PROXY_AUTO_SIGN_UP: "true"
-      GF_AUTH_PROXY_SYNC_TTL: "60"
-      GF_AUTH_PROXY_WHITELIST: "172.23.1.2"
-      GF_AUTH_PROXY_HEADERS: "Name:Remote-Name Email:Remote-Email Groups:Remote-Groups"
-      GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN: "false"
+      # Auth-Proxy AUS. Er existierte nur für den Onion-Zugriff: dort lieferte die
+      # tor-authelia-chain den Remote-User-Header. Tor ist raus, der Grafana-Router
+      # läuft über strip-remote-user + OIDC – es gibt also niemanden mehr, der den
+      # Header legitim setzt. Bleibt er aktiv, hängt die gesamte Absicherung an
+      # der Whitelist (172.23.1.2 = Traefik) und daran, dass strip-remote-user in
+      # der Middleware-Kette stehen bleibt. Anmeldung läuft ausschließlich über
+      # OIDC gegen Authelia.
+      GF_AUTH_PROXY_ENABLED: "false"
     user: "472:472"
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
@@ -88,10 +84,6 @@ services:
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
       - "traefik.http.routers.grafana.middlewares=strip-remote-user@file,default-chain@file"
-      - "traefik.http.routers.grafana-tor.rule=HostRegexp(`^${GRAFANA_SUBDOMAIN:-grafana}\\.[a-z2-7]{16,56}\\.onion`)"
-      - "traefik.http.routers.grafana-tor.entrypoints=tor-http"
-      - "traefik.http.routers.grafana-tor.service=grafana"
-      - "traefik.http.routers.grafana-tor.middlewares=tor-authelia-chain@file"
       - "homepage.group=Monitoring"
       - "homepage.name=Grafana"
       - "homepage.icon=grafana.png"

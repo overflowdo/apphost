@@ -9,13 +9,16 @@
 # Ownership crash-loopt (die "nobody"-Falle: ein von Docker frisch als Host-root
 # angelegtes Verzeichnis erscheint im userns als "nobody").
 #
-# Ownership-Logik (Container-UID + dockremap-Basis, Standard 100000 – muss zu
-# modules/docker.nix passen):
+# Ownership-Logik (Container-UID + dockremap-Basis; die Basis definiert
+# ../lib/userns.nix, zur Laufzeit gilt der Wert aus /etc/subuid):
 #   immich, paperless -> Basis+0     (Container laufen als root)
 #   opencloud         -> Basis+1000  (Container-UID 1000; sonst kein JetStream-Store)
 #   radicale          -> Basis+2999  (Dienst-UID 2999; Container macht chown -R /data)
 #   jellyfin          -> apphost:users, read-only (apphost befüllt, Container liest)
 { pkgs, ... }:
+let
+  remapBase = (import ../lib/userns.nix).remapBase;
+in
 {
   systemd.services.apphost-media-dirs = {
     description = "Create/own /mnt/media service dirs for userns-remapped containers";
@@ -39,9 +42,10 @@
         exit 0
       fi
 
-      # dockremap-Basis aus /etc/subuid (userns-remap "default"), Fallback 100000.
+      # dockremap-Basis aus /etc/subuid (userns-remap "default"),
+      # Fallback = ../lib/userns.nix (die Quelle, aus der /etc/subuid entsteht).
       BASE="$(awk -F: '$1=="dockremap"{print $2}' /etc/subuid 2>/dev/null | head -1)"
-      BASE="''${BASE:-100000}"
+      BASE="''${BASE:-${toString remapBase}}"
 
       own() {  # <dir> <uid=gid> <mode>
         mkdir -p "$1"

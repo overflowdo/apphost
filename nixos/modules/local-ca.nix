@@ -15,25 +15,47 @@
 # Kein Pi-hole nötig: reine lokale Krypto. Idempotent – bestehende Schlüssel bleiben.
 { lib, pkgs, ... }:
 let
-  domain    = "apphost.lan";   # <- bei Domainwechsel hier anpassen
+  # Fallback-Domain. Die tatsächliche Domain kommt zur Laufzeit aus
+  # /opt/monorepo/.env (DOMAIN=...) – dieselbe Quelle, aus der auch Traefik und
+  # die Compose-Router ihre Hostnamen ziehen. Sonst passt das Default-Zertifikat
+  # bei abweichender Domain nicht (sniStrict: false kaschiert das nur).
+  fallbackDomain = "apphost.lan";
+  envFile   = "/opt/monorepo/.env";
   caDir     = "/var/lib/apphost-ca";
   # userns-remap: der Traefik-Container läuft als root (UID 0) -> Host-UID = Basis.
-  # Muss zur dockremap-Basis in modules/docker.nix passen (Standard 100000).
-  remapBase = 100000;
+  remapBase = (import ../lib/userns.nix).remapBase;
 in {
   systemd.services.apphost-local-ca = {
-    description = "Generate local CA + server certificate for ${domain}";
+    description = "Generate local CA + server certificate for the local domain";
     wantedBy = [ "multi-user.target" ];
     before   = [ "docker.service" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
     };
-    path = [ pkgs.openssl pkgs.coreutils ];
+    path = [ pkgs.openssl pkgs.coreutils pkgs.gnused pkgs.gnugrep ];
     script = ''
       set -euo pipefail
+
+      # Domain aus der .env lesen (dieselbe, die Compose/Traefik verwenden).
+      # "|| true": fehlt die .env (Erstinstallation), greift der Fallback unten,
+      # statt dass der Dienst wegen set -e/pipefail abbricht.
+      DOMAIN="$( { sed -n "s/^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*//p" ${envFile} 2>/dev/null \
+                   || true; } | head -1 | tr -d "\"' \r")"
+      DOMAIN="''${DOMAIN:-${fallbackDomain}}"
+      echo "local-ca: Domain = $DOMAIN"
+
       mkdir -p ${caDir}
       cd ${caDir}
+
+      # Passt ein vorhandenes Server-Zertifikat nicht mehr zur Domain (z.B. weil
+      # DOMAIN in der .env geändert wurde), wird es neu ausgestellt. Die CA selbst
+      # bleibt bestehen – sonst müsste sie auf allen Geräten neu importiert werden.
+      if [ -f apphost.crt ] \
+         && ! openssl x509 -in apphost.crt -noout -text | grep -q "DNS:$DOMAIN\b"; then
+        echo "local-ca: Zertifikat passt nicht zu $DOMAIN -> wird neu ausgestellt"
+        rm -f apphost.crt apphost.key
+      fi
 
       # 1. CA (Schlüssel + selbstsigniertes Root-Zertifikat, 10 Jahre).
       #    basicConstraints CA:TRUE + keyUsage keyCertSign sind PFLICHT, sonst
@@ -50,15 +72,15 @@ in {
           -out local-ca.crt
       fi
 
-      # 2. Server-Zertifikat für ${domain} + *.${domain} (825 Tage, von der CA signiert)
+      # 2. Server-Zertifikat für $DOMAIN + *.$DOMAIN (825 Tage, von der CA signiert)
       if [ ! -f apphost.key ] || [ ! -f apphost.crt ]; then
         openssl genrsa -out apphost.key 2048
-        openssl req -new -key apphost.key -subj "/CN=${domain}" -out apphost.csr
+        openssl req -new -key apphost.key -subj "/CN=$DOMAIN" -out apphost.csr
         {
           printf 'basicConstraints=CA:FALSE\n'
           printf 'keyUsage=critical,digitalSignature,keyEncipherment\n'
           printf 'extendedKeyUsage=serverAuth\n'
-          printf 'subjectAltName=DNS:${domain},DNS:*.${domain}\n'
+          printf 'subjectAltName=DNS:%s,DNS:*.%s\n' "$DOMAIN" "$DOMAIN"
           printf 'subjectKeyIdentifier=hash\n'
           printf 'authorityKeyIdentifier=keyid,issuer\n'
         } > san.ext

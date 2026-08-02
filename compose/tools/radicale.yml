@@ -5,7 +5,7 @@ services:
   # Eigene htpasswd-Basic-Auth (DAVx5 macht kein Browser-SSO), daher NICHT hinter
   # Authelia. htpasswd wird von scripts/update-secrets-radicale.sh erzeugt.
   radicale:
-    image: tomsquest/docker-radicale:latest  # von Renovate auf Digest gepinnt
+    image: tomsquest/docker-radicale:3.7.6.0@sha256:89fa44d02b134f0ac37cad809883327af8424499d913eec74f95085c458a93b7
     container_name: radicale
     restart: unless-stopped
     runtime: runc

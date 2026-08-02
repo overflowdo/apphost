@@ -26,27 +26,36 @@ services:
     env_file:
       - ../../secrets/oidc-paperless.env
     environment:
-      PAPERLESS_REDIS: redis://:${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}@paperless-redis:6379
+      PAPERLESS_REDIS: redis://:${PAPERLESS_REDIS_PASSWORD:?}@paperless-redis:6379
       PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?}
       PAPERLESS_URL: https://paperless.${DOMAIN}
       # OIDC-Login gegen Authelia über die lokale CA vertrauen (Python requests)
       REQUESTS_CA_BUNDLE: /certs/local-ca.crt
       PAPERLESS_ALLOWED_HOSTS: "*"
       PAPERLESS_CSRF_TRUSTED_ORIGINS: "https://paperless.${DOMAIN}"
-      PAPERLESS_TRUSTED_PROXIES: traefik
-      # Remote-User-Auth NUR für den Onion-Zugriff: ForwardAuth (tor-authelia-chain)
-      # liefert Remote-User -> Paperless loggt ein. Clearnet entfernt den Header
-      # (strip-remote-user) -> dort gilt OIDC. ACHTUNG: Paperless hat KEINE
-      # IP-Whitelist für diesen Header (siehe Security-Hinweis im Review).
-      PAPERLESS_ENABLE_HTTP_REMOTE_USER: "true"
-      PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME: "HTTP_REMOTE_USER"
-      PAPERLESS_OCR_LANGUAGE: deu+eng
+      # Django TRUSTED_PROXIES vergleicht gegen die IP der Gegenstelle, nicht
+      # gegen einen Hostnamen -> hier die feste Traefik-IP aus traefik-public
+      # (compose/infrastructure/traefik.yml: ipv4_address 172.23.1.2).
+      PAPERLESS_TRUSTED_PROXIES: 172.23.1.2
+      # Remote-User-Auth ist AUS. Sie stammte aus der Tor-Zeit (ForwardAuth über
+      # tor-authelia-chain); Tor ist raus. Paperless kennt – anders als Grafana
+      # (GF_AUTH_PROXY_WHITELIST) – KEINE IP-Whitelist für den Header. Paperless
+      # hängt aber in traefik-public zusammen mit ~18 weiteren Containern: jeder
+      # davon könnte http://paperless:8000/ direkt mit "Remote-User: admin"
+      # aufrufen und wäre – dank SOCIAL_AUTO_SIGNUP notfalls als frisch
+      # angelegter Nutzer – voll eingeloggt. strip-remote-user am Router greift
+      # nur für Clients, die über Traefik kommen. Login läuft ausschließlich
+      # über OIDC gegen Authelia.
+      PAPERLESS_ENABLE_HTTP_REMOTE_USER: "false"
+      PAPERLESS_OCR_LANGUAGE: ${PAPERLESS_OCR_LANGUAGE:-deu+eng}
       PAPERLESS_SESSION_COOKIE_SECURE: "true"
       PAPERLESS_CSRF_COOKIE_SECURE: "true"
       PAPERLESS_ENABLE_UPDATE_CHECK: "false"
       PAPERLESS_TIME_ZONE: Europe/Berlin
       USERMAP_UID: 1000
       USERMAP_GID: 1000
+      # Auto-Signup gilt jetzt nur noch für OIDC-Logins (allauth), die Authelia
+      # zuvor authentifiziert hat – nicht mehr für einen gespooften Header.
       PAPERLESS_SOCIAL_AUTO_SIGNUP: "true"
       PAPERLESS_DISABLE_REGULAR_LOGIN: "true"
     security_opt: ['no-new-privileges:true']
@@ -70,10 +79,6 @@ services:
       - "traefik.http.routers.paperless.entrypoints=websecure"
       - "traefik.http.services.paperless.loadbalancer.server.port=8000"
       - "traefik.http.routers.paperless.middlewares=strip-remote-user@file,default-chain@file"
-      - "traefik.http.routers.paperless-tor.rule=HostRegexp(`^paperless\\.[a-z2-7]{16,56}\\.onion`)"
-      - "traefik.http.routers.paperless-tor.entrypoints=tor-http"
-      - "traefik.http.routers.paperless-tor.service=paperless"
-      - "traefik.http.routers.paperless-tor.middlewares=tor-authelia-chain@file"
       - "homepage.group=Dokumente"
       - "homepage.name=Paperless-NGX"
       - "homepage.icon=paperless-ngx.png"
@@ -86,7 +91,7 @@ services:
     networks: [documents-network]
     volumes:
       - paperless_redis:/data
-    command: ["valkey-server", "--save", "60", "1", "--loglevel", "warning", "--maxmemory", "128mb", "--requirepass", "${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}"]
+    command: ["valkey-server", "--save", "60", "1", "--loglevel", "warning", "--maxmemory", "128mb", "--requirepass", "${PAPERLESS_REDIS_PASSWORD:?}"]
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
     user: "999:999"
@@ -94,7 +99,7 @@ services:
       resources:
         limits: {cpus: "0.5", memory: 128M}
     healthcheck:
-      test: ["CMD", "valkey-cli", "-a", "${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}", "ping"]
+      test: ["CMD", "valkey-cli", "-a", "${PAPERLESS_REDIS_PASSWORD:?}", "ping"]
       interval: 15s
       timeout: 5s
       retries: 3

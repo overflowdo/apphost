@@ -2,9 +2,12 @@ logging {
   level = "warn"
 }
 
-// Docker Container Logs
+// Docker Container Logs.
+// Zugriff über den socket-proxy (compose/infrastructure/traefik.yml) statt über
+// den gemounteten /run/docker.sock: der Proxy lässt nur GET durch (POST=0), das
+// reicht für Discovery + Log-Tailing und schließt "Container starten" aus.
 discovery.docker "containers" {
-  host = "unix:///run/docker.sock"
+  host = "tcp://socket-proxy:2375"
 }
 
 discovery.relabel "docker_containers" {
@@ -32,7 +35,7 @@ discovery.relabel "docker_containers" {
 }
 
 loki.source.docker "containers" {
-  host       = "unix:///run/docker.sock"
+  host       = "tcp://socket-proxy:2375"
   targets    = discovery.relabel.docker_containers.output
   forward_to = [loki.process.drop_noise.receiver]
 }

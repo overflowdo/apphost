@@ -8,6 +8,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
 OUTPUT_FILE="$ROOT_DIR/secrets/ntfy.env"
+# Klartext-Passwort für den Alertmanager. Der liest es per
+# basic_auth.password_file (config/alertmanager/config.yml) – Alertmanager kann
+# keine Umgebungsvariablen in seiner Config expandieren, eine Datei ist der
+# einzige Weg, das Passwort dort hineinzubekommen.
+ALERTMANAGER_PW_FILE="$ROOT_DIR/secrets/alertmanager_ntfy_password"
 
 # Users: "username:role:PASSWORD_ENV_VAR"
 # Roles: admin / user
@@ -72,4 +77,15 @@ NTFY_AUTH_USERS='${auth_users_value}'
 NTFY_AUTH_ACCESS='${auth_access_value}'
 EOF
 
+# Alertmanager-Passwort ohne abschließenden Zeilenumbruch schreiben: Alertmanager
+# trimmt zwar Whitespace, aber ntfy sähe im Zweifel ein falsches Passwort.
+# 0644, weil der Alertmanager-Container als 65534 läuft und unter userns-remap
+# damit auf eine hohe Host-UID gemappt wird – für die ist eine apphost-eigene
+# 0600-Datei nicht lesbar. Gleiche Abwägung wie bei secrets/radicale_users und
+# secrets/authelia_users.yml (Single-Admin-Host). Wer das nicht will: Datei auf
+# (dockremap-Basis + 65534) chownen und auf 0640 setzen.
+printf '%s' "${NTFY_ALERTMANAGER_PASSWORD}" > "$ALERTMANAGER_PW_FILE"
+chmod 644 "$ALERTMANAGER_PW_FILE"
+
 echo "Done. Written to $OUTPUT_FILE"
+echo "                 $ALERTMANAGER_PW_FILE"

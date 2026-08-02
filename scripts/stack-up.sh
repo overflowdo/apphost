@@ -67,6 +67,12 @@ if [[ ! -f secrets/radicale_users ]]; then
     echo
 fi
 
+if [[ ! -f secrets/alertmanager_ntfy_password ]]; then
+    echo "==> Pre-flight: ntfy-Passwort für Alertmanager fehlt -> erzeuge es"
+    bash scripts/update-secrets-ntfy.sh
+    echo
+fi
+
 phase "Phase 1  – Reverse Proxy + SSO"        traefik authelia
 phase "Phase 2  – leichte Dienste (SSD)"      homepage ntfy bichon vaultwarden openspeedtest bento-pdf ca-download radicale grocy
 phase "Phase 3  – Monitoring"                 prometheus grafana loki alertmanager node-exporter cadvisor alloy

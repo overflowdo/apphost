@@ -46,7 +46,13 @@
       "vhost_vsock"   # Kata Containers braucht vsock
       "kvm_amd"       # oder kvm_intel je nach CPU
       "dm_crypt"
-      # seit 26.05 müssen wir diese module scheinbar manuell laden, sonst funktioniert docker-compose up nicht mehr (er kann die nftables nicht erzeugen)
+      # Diese Module müssen hier stehen, weil security.lockKernelModules = true
+      # (modules/security.nix) das Nachladen NACH dem Boot unterbindet: Docker
+      # kann seine iptables-/nftables-Regeln sonst nicht anlegen und
+      # `docker compose up` scheitert. Das ist die bewusste Kehrseite der
+      # Härtung, keine Übergangslösung – wenn ein künftiges Docker-Feature ein
+      # weiteres Modul braucht, gehört es HIER hinein (Fehlerbild: "modprobe:
+      # operation not permitted" im Journal beim Anlegen eines Netzwerks).
       "nf_nat"
       "iptable_nat"
       "iptable_filter"
@@ -92,8 +98,13 @@
       "retbleed=auto,nosmt"
 
       # Kernel Lockdown
+      # Kein "module.sig_enforce=1": nixpkgs baut den Kernel ohne
+      # CONFIG_MODULE_SIG (Reproduzierbarkeit), der Parameter existiert dort gar
+      # nicht und wurde wirkungslos durchgereicht. Aus demselben Grund blockiert
+      # lockdown=confidentiality hier auch keine unsignierten Module – sonst
+      # wäre Docker nicht startbar. Modul-Nachladen unterbindet stattdessen
+      # security.lockKernelModules (modules/security.nix).
       "lockdown=confidentiality"
-      "module.sig_enforce=1"
 
       # IOMMU (verhindert DMA-Angriffe)
       "iommu=force"
@@ -145,6 +156,9 @@
       "net.ipv4.tcp_max_syn_backlog"                  = 4096;
       "net.ipv4.tcp_syn_retries"                      = 2;
       "net.ipv4.tcp_synack_retries"                   = 2;
+      # BPF-JIT ist unten komplett aus (net.core.bpf_jit_enable = 0); harden=2
+      # greift also aktuell nicht und steht hier nur als Netz für den Fall, dass
+      # der JIT je wieder eingeschaltet wird.
       "net.core.bpf_jit_harden"                       = 2;
       "net.ipv4.conf.all.arp_ignore"                  = 1;
       "net.ipv4.conf.all.arp_announce"                = 2;
@@ -167,7 +181,7 @@
       "kernel.kptr_restrict"             = 2;      # Keine Kernel-Pointer-Leaks
       "kernel.dmesg_restrict"            = 1;      # dmesg nur für root
       "kernel.unprivileged_bpf_disabled" = 1;      # eBPF nur privilegiert
-      "net.core.bpf_jit_enable"          = 0;       # BPF JIT deaktiviert
+      "net.core.bpf_jit_enable"          = 0;       # BPF JIT deaktiviert (macht bpf_jit_harden oben gegenstandslos)
       "kernel.perf_event_paranoid"       = 3;      # Keine Perf-Events für normale User
       "kernel.randomize_va_space"        = 2;
       "vm.mmap_rnd_bits"                 = 32;
@@ -181,7 +195,10 @@
       "fs.protected_regular"             = 2;
       "vm.swappiness"                    = 10;
       "kernel.pid_max"                   = 65536;
-      "kernel.unprivileged_userns_clone" = 1;      # User-Namespaces für Docker
+      # kernel.unprivileged_userns_clone gibt es hier NICHT: das ist ein
+      # Debian-Patch-Sysctl, im Mainline-Kernel existiert der Knoten nicht ->
+      # systemd-sysctl loggte bei jedem Boot nur einen Fehler. User-Namespaces
+      # für Docker regelt security.allowUserNamespaces (modules/security.nix).
 
       # Puffer für Docker-Netzwerk
       "net.core.rmem_max" = 16777216;
@@ -373,15 +390,20 @@
     ╚══════════════════════════════════════════════════════════════╝
   '';
 
-  # Automatische Updates (flake-basiert, zieht vom lokalen Repository)
-  system.autoUpgrade = {
-    enable        = true;
-    flake         = "/opt/monorepo";
-    allowReboot   = false;            # Manueller Reboot nach Kernel-Updates
-    dates         = "04:30";
-    flags         = [ "--no-build-output" ];
-    randomizedDelaySec = "15min";
-  };
+  # Automatische Updates: AUS.
+  #
+  # Vorher stand hier enable = true mit flake = "/opt/monorepo". Das ist ein
+  # lokaler Pfad – nixos-upgrade holt von dort nichts, es macht kein `git pull`
+  # und aktualisiert auch die Flake-Inputs nicht. Der tägliche 04:30-Lauf hat
+  # also nur immer wieder dieselbe, bereits gebaute Generation erzeugt: eine
+  # Update-Automatik, die keine Updates einspielt, aber so aussieht.
+  #
+  # Aktualisiert wird bewusst von Hand über den `update`-Alias (siehe oben):
+  #   git pull + nix flake update + nixos-rebuild switch
+  # Wer es wirklich automatisch will, braucht einen Timer, der VORHER `git -C
+  # /opt/monorepo pull` ausführt – das heißt aber auch: jeder Push ins Repo
+  # deployt ungeprüft auf den Host.
+  system.autoUpgrade.enable = false;
 
   # Journal mit persistenten Logs, 4GB Limit
   services.journald.extraConfig = ''

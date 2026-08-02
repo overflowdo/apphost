@@ -12,9 +12,8 @@ Die vollständige Installations‑ und Betriebsanleitung liegt in **[Installatio
 | [`compose/`](compose/)                     | Die einzelnen Service‑Stacks, nach Kategorie gruppiert (siehe unten).                                    |
 | [`config/`](config/)                       | Konfigurationsdateien der Dienste (Traefik, Authelia, Prometheus, Grafana, Homepage, …).                |
 | [`nixos/`](nixos/)                         | NixOS‑Systemkonfiguration: Flake, `disko`‑Partitionierung, Härtungs‑Module und `install.sh`.            |
-| [`scripts/`](scripts/)                     | Betriebs‑ und Secret‑Skripte (Proxmox‑Härtung, Secret‑Generierung, Tor‑Onion‑Adresse anzeigen).         |
+| [`scripts/`](scripts/)                     | Betriebs‑ und Secret‑Skripte (Proxmox‑Härtung, Secret‑Generierung, gestaffelter Stack‑Start, Secrets anzeigen). |
 | [`renovate.json`](renovate.json)           | Renovate‑Konfiguration für automatische Container‑Image‑Updates.                                         |
-| [`Quellen.md`](Quellen.md)                 | Externe Quellen und Referenzen zur Dokumentation.                                                        |
 
 ## Enthaltene Dienste
 
@@ -26,7 +25,7 @@ Die vollständige Installations‑ und Betriebsanleitung liegt in **[Installatio
 | Dokumente        | Paperless‑ngx, BentoPDF                                                |
 | Monitoring       | Prometheus, Grafana, Loki, Alertmanager, node/cAdvisor‑Exporter       |
 | Kommunikation    | ntfy (Push), Bichon (Mail‑Archiv)                                      |
-| Tools            | Homepage (Dashboard), Vaultwarden, OpenSpeedTest                       |
+| Tools            | Homepage (Dashboard), Vaultwarden, OpenSpeedTest, Radicale (CalDAV/CardDAV), Grocy |
 
 ## Kurzüberblick Installation
 

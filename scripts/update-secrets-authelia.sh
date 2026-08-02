@@ -208,7 +208,8 @@ EOF
 # aus Sicht der Datei "other") lesen kann, OHNE dass wir es der Container-UID
 # übereignen (was root bräuchte und regen-secrets als apphost verbieten würde),
 # ist es host-owned + world-readable (0644). Auf einem Single-Admin-Host ist ein
-# world-lesbarer bcrypt-Hash vertretbar.
+# world-lesbarer argon2id-Hash vertretbar (argon2id, nicht bcrypt – siehe
+# argon2_hash() oben und config/authelia/configuration.yml).
 chmod 0644 "$OUTPUT_USERS"
 echo "  -> $OUTPUT_USERS (0644, host-owned)"
 

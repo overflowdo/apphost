@@ -32,12 +32,23 @@ services:
     container_name: cadvisor
     restart: unless-stopped
     runtime: runc
-    networks: [monitoring-network]
-    privileged: true
+    # socket-proxy statt Docker-Socket: früher lag hier /var/run:/var/run:ro,
+    # was den docker.sock mit einschloss. Das ":ro" wirkt nur auf den Mount,
+    # nicht auf das Protokoll – der Container hatte damit volle Docker-API und
+    # hätte sich per privilegiertem Container mit /-Mount Host-Root holen können.
+    # Der socket-proxy erlaubt nur GET (POST=0), damit ist genau das ausgeschlossen.
+    networks: [monitoring-network, socket-proxy]
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+    # Kein "privileged: true" mehr: cAdvisor braucht davon nur /dev/kmsg, und das
+    # wird unten gezielt durchgereicht. Mit privileged war zusätzlich
+    # no-new-privileges wirkungslos.
     userns_mode: "host"
+    command:
+      - "--docker=tcp://socket-proxy:2375"
     volumes:
       - /:/rootfs:ro
-      - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
@@ -82,7 +93,7 @@ services:
     networks: [documents-network, monitoring-network]
     environment:
       REDIS_ADDR: redis://paperless-redis:6379
-      REDIS_PASSWORD: ${PAPERLESS_REDIS_PASSWORD:-paperless_redis_internal_8x3k}
+      REDIS_PASSWORD: ${PAPERLESS_REDIS_PASSWORD:?}
       TZ: Europe/Berlin
     user: "65534:65534"
     security_opt: ['no-new-privileges:true']
@@ -98,14 +109,20 @@ services:
     container_name: alloy
     restart: unless-stopped
     runtime: runc
-    networks: [monitoring-network]
+    # Wie cAdvisor: kein /run/docker.sock mehr (":ro" schützt einen Unix-Socket
+    # nicht – das war voller Docker-API-Zugriff und damit ein Weg zu Host-Root).
+    # Container-Discovery und Log-Tailing laufen jetzt über den socket-proxy
+    # (nur GET). Siehe config/alloy/config.alloy.
+    networks: [monitoring-network, socket-proxy]
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
     userns_mode: "host"
     volumes:
       - ../../config/alloy:/etc/alloy:ro
       - alloy_data:/var/lib/alloy/data
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /run/docker.sock:/run/docker.sock:ro
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     security_opt: ['no-new-privileges:true']
     deploy:
