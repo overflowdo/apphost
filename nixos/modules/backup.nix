@@ -15,18 +15,36 @@
   # sqlite3 wird vom Backup-Skript für ".backup" gebraucht.
   environment.systemPackages = [ pkgs.sqlite ];
 
+  # Meldet fehlgeschlagene Dienste per Push. Ohne das bliebe ein gescheitertes
+  # Backup still in systemd stehen: die Benachrichtigungskette geht über
+  # Prometheus -> Alertmanager -> ntfy und sieht nur, was Prometheus scrapt –
+  # systemd-Units gehören nicht dazu. node-exporter mit --collector.systemd
+  # nachzurüsten wäre die Alternative, bräuchte aber den D-Bus-Socket im
+  # Container und weicht dessen Isolation auf.
+  # Testen: sudo systemctl start apphost-notify-failure@apphost-db-backup.service
+  systemd.services."apphost-notify-failure@" = {
+    description = "Report a failed unit (%i) to ntfy";
+    path = [ pkgs.curl pkgs.systemd pkgs.coreutils pkgs.gnugrep ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.bash}/bin/bash /opt/monorepo/scripts/notify-failure.sh %i";
+    };
+    unitConfig.ConditionPathExists = "/opt/monorepo/scripts/notify-failure.sh";
+  };
+
   systemd.services.apphost-db-backup = {
     description = "Application-consistent database dumps for the AppHost stack";
     after = [ "docker.service" ];
     wants = [ "docker.service" ];
-    path  = [ pkgs.docker pkgs.sqlite pkgs.gzip pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.bash ];
+    path  = [ pkgs.docker pkgs.sqlite pkgs.gzip pkgs.age pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.bash ];
+    # Fehlschlag (auch ein Teilfehlschlag -> exit 1) geht als Push raus.
+    onFailure = [ "apphost-notify-failure@%n.service" ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${pkgs.bash}/bin/bash /opt/monorepo/scripts/backup-databases.sh";
-      # Fehlt das Repo (z.B. vor der Erstinstallation), soll der Timer nicht
-      # dauerhaft als "failed" stehen.
-      SuccessExitStatus = [ 0 ];
     };
+    # Fehlt das Repo (z.B. vor der Erstinstallation), läuft der Dienst gar nicht
+    # erst an, statt als "failed" stehen zu bleiben.
     unitConfig.ConditionPathExists = "/opt/monorepo/scripts/backup-databases.sh";
   };
 

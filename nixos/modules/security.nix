@@ -196,6 +196,8 @@
   systemd.services.aide-check = {
     description = "AIDE File Integrity Check";
     startAt     = "daily";
+    # Fehlschlag per Push melden (Template-Unit in modules/backup.nix).
+    onFailure   = [ "apphost-notify-failure@%n.service" ];
     # Die Datenbank wurde nirgends initialisiert -> der Dienst gab jeden Tag nur
     # den Hinweis "Datenbank nicht gefunden" aus und hat nie geprüft. Jetzt legt
     # er sie beim ersten Lauf selbst an.
@@ -223,6 +225,22 @@
       fi
 
       if [ -n "$REASON" ]; then
+        # Vor dem Neu-Ziehen NOCH EINMAL gegen die alte Baseline prüfen und den
+        # Report wegschreiben. Sonst entstünde genau die Lücke, die eine
+        # automatische Neu-Baseline mit sich bringt: eine Manipulation, die
+        # zeitlich mit einem nixos-rebuild zusammenfällt, wäre nie gemeldet
+        # worden – und `rebuild`/`update` sind Aliase, die jederzeit laufen.
+        # Der Report enthält dann zwar auch das Rebuild-Rauschen, aber er
+        # existiert und ist nachlesbar.
+        if [ -f /var/lib/aide/aide.db ]; then
+          REPORT="/var/log/aide-vor-rebaseline-$(date +%Y%m%d-%H%M%S).log"
+          echo "AIDE: Report gegen die alte Baseline -> $REPORT"
+          ${pkgs.aide}/bin/aide --check > "$REPORT" 2>&1 || true
+          # Nur die letzten zehn aufheben.
+          ls -1t /var/log/aide-vor-rebaseline-*.log 2>/dev/null \
+            | tail -n +11 | xargs -r rm -f
+        fi
+
         echo "AIDE: $REASON -> Baseline wird neu erstellt (aide --init)."
         ${pkgs.aide}/bin/aide --init
         mv -f /var/lib/aide/aide.db.new /var/lib/aide/aide.db

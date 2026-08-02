@@ -132,6 +132,8 @@ in
   systemd.services.docker-security-scan = {
     description = "Weekly Docker Image Security Scan";
     startAt     = "Mon 02:00";
+    # Fehlschlag per Push melden (Template-Unit in modules/backup.nix).
+    onFailure   = [ "apphost-notify-failure@%n.service" ];
     script      = ''
       docker ps --format "{{.Image}}" | sort -u | while read image; do
         ${pkgs.trivy}/bin/trivy image --severity HIGH,CRITICAL \
