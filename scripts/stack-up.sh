@@ -57,21 +57,9 @@ phase() {
 }
 
 # --- Pre-flight: fehlende Secrets erzeugen (idempotent) ---------------------
-# Dienste, die eine Secret-Datei per Bind-Mount einhängen, brauchen die Datei
-# VOR dem Start – sonst legt Docker dort ein Verzeichnis an und der Container
-# startet kaputt. Die Generatoren sind idempotent (behalten Bestehendes).
-# Muster für künftige secret-basierte Dienste: hier eine Zeile ergänzen.
-if [[ ! -f secrets/radicale_users ]]; then
-    echo "==> Pre-flight: Radicale-Secret fehlt -> erzeuge es"
-    bash scripts/update-secrets-radicale.sh
-    echo
-fi
-
-if [[ ! -f secrets/alertmanager_ntfy_password ]]; then
-    echo "==> Pre-flight: ntfy-Passwort für Alertmanager fehlt -> erzeuge es"
-    bash scripts/update-secrets-ntfy.sh
-    echo
-fi
+# Prüft ALLE per Bind-Mount eingehängten Secret-Dateien. Liegt in einer eigenen
+# Datei, weil der Alias `up-all` (docker compose up -d) sie ebenfalls aufruft.
+bash scripts/ensure-secrets.sh
 
 phase "Phase 1  – Reverse Proxy + SSO"        traefik authelia
 phase "Phase 2  – leichte Dienste (SSD)"      homepage ntfy bichon vaultwarden openspeedtest bento-pdf ca-download radicale grocy
