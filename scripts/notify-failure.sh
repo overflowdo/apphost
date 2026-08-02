@@ -57,7 +57,6 @@ CURL_ARGS=(-fsS --max-time 20
     -H "Priority: high"
     -H "Tags: rotating_light"
     -d "$BODY")
-[[ -f "$CA_FILE" ]] && CURL_ARGS+=(--cacert "$CA_FILE")
 
 # Zugangsdaten über eine Konfiguration auf stdin (-K -) statt über -u:
 # alles in argv ist auf dem Host per `ps` mitlesbar. In der curl-Konfiguration
@@ -70,8 +69,20 @@ curl_config() {
     printf 'user = "alertmanager:%s"\n' "$pw"
 }
 
-if curl_config | curl -K - "${CURL_ARGS[@]}" "https://${NTFY_SUBDOMAIN}.${DOMAIN}/apphost-critical" >/dev/null; then
+URL="https://${NTFY_SUBDOMAIN}.${DOMAIN}/apphost-critical"
+
+# Erst mit dem System-Truststore, erst danach mit der lokalen CA.
+#
+# --cacert ERSETZT den Truststore, es ergänzt ihn nicht. local-ca.crt wird von
+# apphost-local-ca.service in JEDER Konfiguration erzeugt, auch wenn der Stack
+# mit echter Domain und Let's-Encrypt-Zertifikat läuft (der Weg, den install.sh
+# ausdrücklich offenhält). Ein festes --cacert hätte dort die Verifikation
+# gebrochen. Reihenfolge also: normaler Weg zuerst, lokale CA als Rückfall.
+if curl_config | curl -K - "${CURL_ARGS[@]}" "$URL" >/dev/null 2>&1; then
     echo "apphost-notify-failure: Meldung an ntfy zugestellt." >&2
+elif [[ -f "$CA_FILE" ]] \
+     && curl_config | curl -K - "${CURL_ARGS[@]}" --cacert "$CA_FILE" "$URL" >/dev/null 2>&1; then
+    echo "apphost-notify-failure: Meldung an ntfy zugestellt (lokale CA)." >&2
 else
     echo "apphost-notify-failure: Zustellung an ntfy fehlgeschlagen." >&2
 fi
