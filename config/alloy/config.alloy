@@ -68,31 +68,66 @@ loki.process "drop_noise" {
   }
 }
 
-// Host System Logs
-local.file_match "syslog" {
-  path_targets = [{
-    __path__ = "/var/log/syslog",
-    job      = "syslog",
-    host     = "apphost",
-  }]
+// Host System Logs aus dem systemd-Journal.
+//
+// Hier standen vorher zwei loki.source.file auf /var/log/syslog und
+// /var/log/auth.log. Beide Dateien gibt es auf NixOS nicht: es läuft kein
+// rsyslog, alles liegt im Journal (services.journald mit Storage=persistent,
+// siehe nixos/configuration.nix). Die Host-Logs kamen also nie in Loki an –
+// dieselbe Klasse Fehler wie das fail2ban-Jail, das auf /var/log/auth.log zeigte.
+//
+// Voraussetzungen, damit das im Container funktioniert (alle erfüllt):
+//   - /var/log ist read-only gemountet, darin liegt /var/log/journal. Nur Lesen
+//     nötig; den Cursor legt Alloy unter --storage.path ab (Volume alloy_data).
+//   - Das Alloy-Image setzt bewusst KEIN USER, der Prozess läuft als root und
+//     darf die Journal-Dateien (0640 root:systemd-journal) lesen. Der Hinweis in
+//     der Alloy-Doku, den alloy-Nutzer in die Gruppen adm/systemd-journal zu
+//     stecken, betrifft die Paketinstallation, nicht diesen Fall.
+//   - Das Image installiert libsystemd0, die Journal-Unterstützung ist also
+//     einkompiliert.
+loki.relabel "journal" {
+  // Leeres forward_to: diese Komponente existiert nur, um ihre rules zu
+  // exportieren (so dokumentiert es Alloy selbst).
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal__hostname"]
+    target_label  = "host"
+  }
+  rule {
+    source_labels = ["__journal_syslog_identifier"]
+    target_label  = "syslog_identifier"
+  }
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+  // Audit-Meldungen NICHT nach Loki. Die Audit-Regeln in
+  // nixos/modules/security.nix überwachen unter anderem fehlgeschlagene Lesezugriffe
+  // auf /etc; zusammen mit journald Audit=yes wäre das ein Dauerstrom, der die
+  // eigentlich interessanten Host-Logs zudeckt. Auf dem Host bleiben sie
+  // vollständig erhalten (journalctl _TRANSPORT=audit, außerdem
+  // /var/log/audit). Zum Mitschicken: diese Regel entfernen.
+  rule {
+    source_labels = ["__journal__transport"]
+    regex         = "audit"
+    action        = "drop"
+  }
 }
 
-loki.source.file "syslog" {
-  targets    = local.file_match.syslog.targets
-  forward_to = [loki.write.loki.receiver]
-}
-
-local.file_match "auth" {
-  path_targets = [{
-    __path__ = "/var/log/auth.log",
-    job      = "auth",
-    host     = "apphost",
-  }]
-}
-
-loki.source.file "auth" {
-  targets    = local.file_match.auth.targets
-  forward_to = [loki.write.loki.receiver]
+loki.source.journal "host" {
+  // Explizit, statt Alloy zwischen /var/log/journal und /run/log/journal wählen
+  // zu lassen: nur das persistente Verzeichnis ist in den Container gemountet.
+  path          = "/var/log/journal"
+  // Nach einem längeren Ausfall nicht das komplette Journal nachladen.
+  max_age       = "12h"
+  relabel_rules = loki.relabel.journal.rules
+  labels        = {job = "systemd-journal"}
+  forward_to    = [loki.write.loki.receiver]
 }
 
 // Traefik-Access-Log.

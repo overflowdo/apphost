@@ -332,7 +332,7 @@
     {
       "id": 6,
       "type": "logs",
-      "title": "Auth-Log – fehlgeschlagene Logins",
+      "title": "SSH/fail2ban – fehlgeschlagene Logins",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -350,7 +350,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{job=\"auth\"} |~ `(?i)(failed|invalid|failure|authentication failure)`",
+          "expr": "{job=\"systemd-journal\", unit=~\"sshd.service|fail2ban.service\"} |~ `(?i)(failed|invalid|failure|authentication failure|ban)`",
           "queryType": "range"
         }
       ],
