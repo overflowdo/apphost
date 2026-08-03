@@ -1,0 +1,107 @@
+# Statische Prüfungen für jeden Push und Pull Request.
+#
+# Fängt genau die Klasse von Fehlern, die in diesem Repo mehrfach durchgerutscht
+# ist: eine Compose-Datei, die sich nicht mehr rendern lässt, ein Shell-Skript
+# mit einem Tippfehler im Pfad, eine YAML-Datei mit einem überzähligen
+# Anführungszeichen, eine Nix-Datei, die nicht evaluiert.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Platzhalter-.env und Secret-Dateien anlegen
+        # Die echten Werte stehen nie im Repo; für "config" genügen Attrappen.
+        # Fehlen die per Bind-Mount eingehängten Secret-Dateien, bricht compose
+        # mit "env file not found" ab.
+        run: |
+          set -euo pipefail
+          sed -e 's/^\(PAPERLESS_REDIS_PASSWORD\)=.*/\1=ci/' .env.example > .env
+          {
+            echo "CF_DNS_API_TOKEN=ci"
+            echo "IMMICH_DB_PASSWORD=ci"
+            echo "IMMICH_JWT_SECRET=ci"
+            echo "PAPERLESS_SECRET_KEY=ci"
+            echo "PAPERLESS_REDIS_PASSWORD=ci"
+            echo "OPENCLOUD_ADMIN_PASSWORD=ci"
+            echo "COLLABORA_ADMIN_PASSWORD=ci"
+            echo "GRAFANA_ADMIN_PASSWORD=ci"
+            echo "GRAFANA_SECRET_KEY=ci"
+            echo "VAULTWARDEN_ADMIN_TOKEN=ci"
+          } >> .env
+          mkdir -p secrets
+          touch secrets/authelia.env secrets/authelia_oidc_jwks.pem \
+                secrets/authelia_users.yml secrets/ntfy.env \
+                secrets/alertmanager_ntfy_password secrets/radicale_users \
+                secrets/oidc-grafana.env secrets/oidc-paperless.env
+      - name: Compose-Konfiguration rendern
+        run: docker compose config --quiet
+      - name: Auf zurückgelassene :latest-Images prüfen
+        run: |
+          if grep -rn --include='*.yml' -E '^\s*image:.*:latest' compose/ ; then
+            echo "::error::Image ohne feste Version gefunden (siehe oben)."
+            exit 1
+          fi
+
+  shell:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Syntax
+        run: |
+          set -euo pipefail
+          for f in scripts/*.sh nixos/install.sh; do bash -n "$f"; done
+          sh -n config/traefik/render.sh
+      - name: shellcheck
+        # SC1091: eingebundene Dateien (.env) existieren im Checkout nicht.
+        run: shellcheck -e SC1091 scripts/*.sh nixos/install.sh config/traefik/render.sh
+
+  yaml:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install yamllint
+      - name: yamllint
+        # config/authelia/configuration.yml ist ein Go-Template, kein reines YAML.
+        run: |
+          yamllint -d '{extends: relaxed, rules: {line-length: disable, comments: disable, comments-indentation: disable}}' \
+            $(git ls-files '*.yml' '*.yaml' | grep -v 'config/authelia/configuration.yml')
+
+  nix:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: "experimental-features = nix-command flakes"
+      - name: Maschinenspezifische Platzhalter erzeugen
+        # Diese drei Dateien erzeugt nixos/install.sh pro Installation und sind
+        # deshalb gitignored – ohne sie evaluiert das Flake nicht.
+        run: |
+          set -euo pipefail
+          cat > nixos/hardware-configuration.nix <<'NIXEOF'
+          { modulesPath, lib, ... }:
+          {
+            imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
+            fileSystems."/" = { device = "/dev/disk/by-label/nixos"; fsType = "btrfs"; };
+            boot.loader.grub.enable = false;
+            nixpkgs.hostPlatform = "x86_64-linux";
+          }
+          NIXEOF
+          echo '[ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICIexampleexampleexampleexampleexampleexampl ci@example" ]' > nixos/ssh-key.nix
+          echo 'false' > nixos/disk-encryption.nix
+      - run: nix flake check --no-build --all-systems
