@@ -88,7 +88,7 @@ services:
       - "homepage.icon=paperless-ngx.png"
       - "homepage.href=https://paperless.${DOMAIN}"
   paperless-redis:
-    image: valkey/valkey:8-alpine@sha256:cfe71288f087704b06be45e270afa7a2abbf820093d6b11a23762081f5ff321d
+    image: valkey/valkey:8-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
     container_name: paperless-redis
     restart: unless-stopped
     runtime: runc
