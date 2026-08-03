@@ -188,7 +188,11 @@ Prüfen lässt sich der Name nach dem ersten Boot in der VM mit `ls -l /dev/disk
 >
 > ```bash
 > down
-> mountpoint -q /mnt/media && { echo "ABBRUCH: Platte ist eingehängt, hier steht nichts zum Aufräumen."; } || sudo rm -rf /mnt/media/*
+> if mountpoint -q /mnt/media; then
+>   echo "ABBRUCH: Platte ist eingehängt – hier steht nichts zum Aufräumen."
+> else
+>   sudo rm -rf /mnt/media/*
+> fi
 > # Platte einhängen (oder Host neu starten), dann:
 > sudo systemctl start apphost-media-dirs
 > up
