@@ -3,7 +3,7 @@ volumes:
   authelia_data: {name: apphost_authelia_data}
 services:
   authelia:
-    image: authelia/authelia:4.38.18@sha256:a5e6fa4b1dbdc296f80f9175157b145a0598690ec8cd4d6e105cd4498fe0c731
+    image: authelia/authelia:4.39.20@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
     container_name: authelia
     restart: unless-stopped
     runtime: runc
