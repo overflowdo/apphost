@@ -45,13 +45,18 @@ route:
 # Passwort kommt aus secrets/alertmanager_ntfy_password (dorthin geschrieben von
 # update-secrets-ntfy.sh, gemountet nach /run/secrets/ntfy_password,
 # siehe compose/monitoring/alertmanager.yml).
+#
+# "priority=high" nur beim kritischen Topic: scripts/notify-failure.sh schickt
+# systemd-Fehlschläge ebenfalls mit hoher Priorität – ohne den Parameter
+# kämen ausgerechnet die kritischen Prometheus-Alerts mit Standardprioritaet
+# an und gingen auf dem Handy unter. Warnungen bleiben bewusst normal.
 receivers:
   # Null-Receiver (für stille Alerts)
   - name: "null"
   # Kritische Alerts (hohe Priorität)
   - name: ntfy-critical
     webhook_configs:
-      - url: "http://ntfy:80/apphost-critical?template=alertmanager"
+      - url: "http://ntfy:80/apphost-critical?template=alertmanager&priority=high"
         send_resolved: true
         http_config:
           basic_auth:
