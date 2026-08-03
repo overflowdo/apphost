@@ -116,8 +116,8 @@
         };
       };
 
-      # Traefik: fehlgeschlagene Anmeldungen (Authelia-ForwardAuth,
-      # Radicale-Basic-Auth, Vaultwarden).
+      # Traefik: fehlgeschlagene Anmeldungen an Authelia und Vaultwarden.
+      # (Radicale bewusst nicht – Begründung beim Filter weiter unten.)
       #
       # WICHTIG – eigener Hook: fail2ban hängt seine Kette per Default in den
       # input-Hook. Traffic auf 80/443 wird von Docker aber in prerouting per
@@ -149,9 +149,13 @@
           # hätte also nie gematcht. port="8081,8443" wäre die Alternative,
           # koppelt das Jail aber an das Compose-Port-Mapping. Ein Ban ist
           # ohnehin IP-basiert, ein Port-Match bringt hier nichts.
+          # protocol="tcp,udp", nicht nur tcp: Traefik veröffentlicht auch
+          # 443:8443/udp für HTTP/3. Ein Browser, der die Alt-Svc-Ankündigung
+          # schon kennt, spräche nach einem reinen TCP-Ban einfach per QUIC
+          # weiter. nft nimmt "meta l4proto { tcp, udp }".
           # Gegenprobe: sudo nft list table inet f2b-table -> es darf KEIN
-          # "dport" in der Regel stehen.
-          action   = ''nftables-allports[name=traefik-auth, protocol=tcp, chain=f2b-forward, chain_hook=forward, chain_priority=-150]'';
+          # "dport" in der Regel stehen, und l4proto muss beide nennen.
+          action   = ''nftables-allports[name=traefik-auth, protocol="tcp,udp", chain=f2b-forward, chain_hook=forward, chain_priority=-150]'';
           # Ohne ignoreip sperrt sich der Admin selbst aus, sobald die Bans
           # wirken: Container-interne Aufrufe (Homepage-Widgets, Healthchecks)
           # kommen aus 172.16.0.0/12 und dürfen nie zu einem Ban führen.
@@ -188,14 +192,23 @@
   #    geprüft werden:
   #      - Authelia: /api/firstfactor und /api/secondfactor/* -> 401
   #      - Vaultwarden: /identity/connect/token -> 400 (invalid_grant, OAuth2)
-  #      - Radicale: Basic-Auth bei JEDEM Request, es gibt keinen Login-Pfad ->
-  #        deshalb über ServiceName statt über den Pfad. Das ist zugleich
-  #        unabhängig von RADICALE_SUBDOMAIN.
+  #
+  #    Radicale steht BEWUSST NICHT hier. Es antwortet auf jede Anfrage ohne
+  #    Zugangsdaten mit 401 – das ist der reguläre Basic-Auth-Handshake, kein
+  #    Fehlversuch. Clients, die nicht preemptiv authentifizieren, erzeugen das
+  #    bei jeder neuen Verbindung, und aus dem Access-Log ist beides nicht zu
+  #    unterscheiden (der Authorization-Header wird dort absichtlich verworfen).
+  #    Da ignoreip das LAN bewusst nicht enthält, hätte ein Fehlalarm echte
+  #    Nutzer getroffen – eine Stunde, eskalierend bis 48. Radicale schützt
+  #    stattdessen das eigene Rate-Limit (dav-chain, 8/s, siehe
+  #    config/traefik/dynamic/middlewares.yml) plus der bcrypt-Kostenfaktor.
+  #    Wer dort echten Brute-Force-Schutz will, braucht Radicales EIGENES Log
+  #    ("Failed login attempt from ..."), das den Unterschied kennt – das laeuft
+  #    aber nach stdout und müsste erst in eine Datei umgeleitet werden.
   environment.etc."fail2ban/filter.d/traefik-auth.conf".text = ''
     [Definition]
     failregex = ^.*"ClientHost":"<HOST>".*"DownstreamStatus":401.*"RequestPath":"/api/(first|second)factor.*$
                 ^.*"ClientHost":"<HOST>".*"DownstreamStatus":400.*"RequestPath":"/identity/connect/token".*$
-                ^.*"ClientHost":"<HOST>".*"DownstreamStatus":401.*"ServiceName":"radicale@docker".*$
     ignoreregex =
     datepattern = "StartUTC":"%%Y-%%m-%%dT%%H:%%M:%%S
   '';
@@ -276,7 +289,14 @@
       # nixos/ – der Alias `pull` ändert genau die, ohne die System-Generation
       # zu berühren. Ohne den zweiten Teil käme nach jedem `pull` beim
       # nächsten 02:30-Lauf eine Push-Meldung mit dem kompletten git-Diff.
-      REPO_REV="$(${pkgs.git}/bin/git -C /opt/monorepo rev-parse HEAD 2>/dev/null || echo none)"
+      # "-c safe.directory": aide-check läuft als root, /opt/monorepo gehört
+      # aber apphost (uid 1000, gesetzt von install.sh). Ohne die Ausnahme
+      # bricht git mit "detected dubious ownership" ab, das "|| echo none"
+      # schluckt den Fehler, und REPO_REV wäre konstant "none" – die Kennung
+      # änderte sich dann wieder nur bei nixos-rebuild und das Rauschen nach
+      # einem `pull` wäre zurück.
+      REPO_REV="$(${pkgs.git}/bin/git -c safe.directory=/opt/monorepo \
+                    -C /opt/monorepo rev-parse HEAD 2>/dev/null || echo none)"
       GEN="$(readlink -f /run/current-system)+$REPO_REV"
       STAMP=/var/lib/aide/system-generation
 

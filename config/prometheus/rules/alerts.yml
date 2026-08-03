@@ -103,33 +103,273 @@ groups:
         annotations:
           summary: "cAdvisor meldet keinerlei Container mehr"
           description: "Entweder ist cAdvisor selbst weg oder seine Docker-Integration (socket-proxy INFO=1)."
-      # Ausfall eines EINZELNEN Containers.
+      # Ausfall eines EINZELNEN Containers – eine Regel je erwartetem Container.
       #
-      # NICHT "time() - container_last_seen > 120": Prometheus markiert eine
-      # Serie als stale, sobald sie aus einem Scrape verschwindet – nicht erst
-      # nach fünf Minuten. Stirbt ein Container, nimmt cAdvisor ihn aus
-      # /metrics, und beim nächsten Scrape gibt es container_last_seen fuer
-      # ihn gar nicht mehr. Die Differenz wird also nie 120, der Ausdruck
-      # liefert einen leeren Vektor und der Alert feuert nie – dieselbe
-      # Fehlerklasse wie beim ursprünglichen absent().
+      # Warum die Liste und nicht etwas Selbstpflegendes: Prometheus kann von
+      # sich aus nicht wissen, WAS da sein sollte. Beide vorherigen Versuche
+      # scheiterten daran:
+      #   - "time() - container_last_seen > 120": Prometheus markiert eine Serie
+      #     als stale, sobald sie aus einem Scrape fällt. Der Ausdruck liefert
+      #     dann einen leeren Vektor und feuert nie.
+      #   - "offset 10m unless ...": flankengetriggert. Nach 10 Minuten ist
+      #     "war vorher da" nicht mehr wahr, der Alert löst sich selbst auf –
+      #     mit send_resolved: true käme ein "Resolved" für einen Dienst, der
+      #     weiterhin tot ist.
+      # absent() je Container ist dagegen level-getriggert: es steht an, solange
+      # der Container fehlt.
       #
-      # Diese Form vergleicht stattdessen "war vor 10 Minuten da" mit "ist
-      # jetzt da" und braucht dafür keine hartkodierte Container-Liste.
-      # Bekannter Nebeneffekt: ein bewusst entfernter Container meldet sich
-      # einmalig für 10 Minuten.
-      - alert: ContainerVanished
-        expr: |
-          count by (name) (container_last_seen{name!=""} offset 10m)
-            unless
-          count by (name) (container_last_seen{name!=""})
-        for: 2m
+      # Die Liste ist pflegbar, weil der Stack im Repo festliegt – und die CI
+      # gleicht sie gegen `docker compose config` ab (Job "configs"), damit sie
+      # nicht auseinanderläuft. traefik-init fehlt bewusst: restart "no",
+      # der Container beendet sich nach getaner Arbeit.
+      - alert: ContainerDown_alertmanager
+        expr: absent(container_last_seen{name="alertmanager"})
+        for: 3m
         labels:
           severity: critical
+          container: "alertmanager"
         annotations:
-          summary: "Container läuft nicht mehr: {{ $labels.name }}"
-          description: "War vor 10 Minuten noch da, wird von cAdvisor jetzt nicht mehr gemeldet."
-      # Ein Container, der dauerhaft neu startet, verschwindet nie lange genug
-      # für die Regel oben. ContainerRestarting unten deckt diesen Fall ab.
+          summary: "Container läuft nicht: alertmanager"
+      - alert: ContainerDown_alloy
+        expr: absent(container_last_seen{name="alloy"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "alloy"
+        annotations:
+          summary: "Container läuft nicht: alloy"
+      - alert: ContainerDown_authelia
+        expr: absent(container_last_seen{name="authelia"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "authelia"
+        annotations:
+          summary: "Container läuft nicht: authelia"
+      - alert: ContainerDown_bento_pdf
+        expr: absent(container_last_seen{name="bento-pdf"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "bento-pdf"
+        annotations:
+          summary: "Container läuft nicht: bento-pdf"
+      - alert: ContainerDown_bichon
+        expr: absent(container_last_seen{name="bichon"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "bichon"
+        annotations:
+          summary: "Container läuft nicht: bichon"
+      - alert: ContainerDown_ca_download
+        expr: absent(container_last_seen{name="ca-download"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "ca-download"
+        annotations:
+          summary: "Container läuft nicht: ca-download"
+      - alert: ContainerDown_cadvisor
+        expr: absent(container_last_seen{name="cadvisor"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "cadvisor"
+        annotations:
+          summary: "Container läuft nicht: cadvisor"
+      - alert: ContainerDown_collabora
+        expr: absent(container_last_seen{name="collabora"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "collabora"
+        annotations:
+          summary: "Container läuft nicht: collabora"
+      - alert: ContainerDown_collaboration
+        expr: absent(container_last_seen{name="collaboration"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "collaboration"
+        annotations:
+          summary: "Container läuft nicht: collaboration"
+      - alert: ContainerDown_grafana
+        expr: absent(container_last_seen{name="grafana"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "grafana"
+        annotations:
+          summary: "Container läuft nicht: grafana"
+      - alert: ContainerDown_grocy
+        expr: absent(container_last_seen{name="grocy"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "grocy"
+        annotations:
+          summary: "Container läuft nicht: grocy"
+      - alert: ContainerDown_homepage
+        expr: absent(container_last_seen{name="homepage"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "homepage"
+        annotations:
+          summary: "Container läuft nicht: homepage"
+      - alert: ContainerDown_immich_ml
+        expr: absent(container_last_seen{name="immich-ml"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "immich-ml"
+        annotations:
+          summary: "Container läuft nicht: immich-ml"
+      - alert: ContainerDown_immich_postgres
+        expr: absent(container_last_seen{name="immich-postgres"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "immich-postgres"
+        annotations:
+          summary: "Container läuft nicht: immich-postgres"
+      - alert: ContainerDown_immich_redis
+        expr: absent(container_last_seen{name="immich-redis"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "immich-redis"
+        annotations:
+          summary: "Container läuft nicht: immich-redis"
+      - alert: ContainerDown_immich_redis_exporter
+        expr: absent(container_last_seen{name="immich-redis-exporter"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "immich-redis-exporter"
+        annotations:
+          summary: "Container läuft nicht: immich-redis-exporter"
+      - alert: ContainerDown_immich_server
+        expr: absent(container_last_seen{name="immich-server"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "immich-server"
+        annotations:
+          summary: "Container läuft nicht: immich-server"
+      - alert: ContainerDown_jellyfin
+        expr: absent(container_last_seen{name="jellyfin"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "jellyfin"
+        annotations:
+          summary: "Container läuft nicht: jellyfin"
+      - alert: ContainerDown_loki
+        expr: absent(container_last_seen{name="loki"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "loki"
+        annotations:
+          summary: "Container läuft nicht: loki"
+      - alert: ContainerDown_node_exporter
+        expr: absent(container_last_seen{name="node-exporter"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "node-exporter"
+        annotations:
+          summary: "Container läuft nicht: node-exporter"
+      - alert: ContainerDown_ntfy
+        expr: absent(container_last_seen{name="ntfy"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "ntfy"
+        annotations:
+          summary: "Container läuft nicht: ntfy"
+      - alert: ContainerDown_opencloud
+        expr: absent(container_last_seen{name="opencloud"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "opencloud"
+        annotations:
+          summary: "Container läuft nicht: opencloud"
+      - alert: ContainerDown_openspeedtest
+        expr: absent(container_last_seen{name="openspeedtest"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "openspeedtest"
+        annotations:
+          summary: "Container läuft nicht: openspeedtest"
+      - alert: ContainerDown_paperless
+        expr: absent(container_last_seen{name="paperless"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "paperless"
+        annotations:
+          summary: "Container läuft nicht: paperless"
+      - alert: ContainerDown_paperless_redis
+        expr: absent(container_last_seen{name="paperless-redis"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "paperless-redis"
+        annotations:
+          summary: "Container läuft nicht: paperless-redis"
+      - alert: ContainerDown_paperless_redis_exporter
+        expr: absent(container_last_seen{name="paperless-redis-exporter"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "paperless-redis-exporter"
+        annotations:
+          summary: "Container läuft nicht: paperless-redis-exporter"
+      - alert: ContainerDown_prometheus
+        expr: absent(container_last_seen{name="prometheus"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "prometheus"
+        annotations:
+          summary: "Container läuft nicht: prometheus"
+      - alert: ContainerDown_radicale
+        expr: absent(container_last_seen{name="radicale"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "radicale"
+        annotations:
+          summary: "Container läuft nicht: radicale"
+      - alert: ContainerDown_socket_proxy
+        expr: absent(container_last_seen{name="socket-proxy"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "socket-proxy"
+        annotations:
+          summary: "Container läuft nicht: socket-proxy"
+      - alert: ContainerDown_traefik
+        expr: absent(container_last_seen{name="traefik"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "traefik"
+        annotations:
+          summary: "Container läuft nicht: traefik"
+      - alert: ContainerDown_vaultwarden
+        expr: absent(container_last_seen{name="vaultwarden"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "vaultwarden"
+        annotations:
+          summary: "Container läuft nicht: vaultwarden"
       - alert: ContainerHighMemory
         expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
         for: 5m
