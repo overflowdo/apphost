@@ -76,6 +76,10 @@ cat > "$OUTPUT_FILE" <<EOF
 NTFY_AUTH_USERS='${auth_users_value}'
 NTFY_AUTH_ACCESS='${auth_access_value}'
 EOF
+# Wie alle anderen erzeugten Secret-Dateien: nur für den Besitzer lesbar.
+# "docker compose" liest sie per env_file auf dem HOST (als apphost), nicht im
+# Container – 600 reicht also.
+chmod 600 "$OUTPUT_FILE"
 
 # Alertmanager-Passwort ohne abschließenden Zeilenumbruch schreiben: Alertmanager
 # trimmt zwar Whitespace, aber ntfy sähe im Zweifel ein falsches Passwort.
