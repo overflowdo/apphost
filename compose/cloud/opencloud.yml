@@ -27,7 +27,11 @@ services:
       PROXY_TLS: "false"
       IDM_ADMIN_PASSWORD: ${OPENCLOUD_ADMIN_PASSWORD:?}
       IDM_CREATE_DEMO_USERS: "false"
-      OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD: "false"
+      # Öffentliche Links MÜSSEN ein Passwort haben. Stand vorher ohne
+      # Begründung auf "false": ein durchgereichter Link war damit für jeden
+      # nutzbar, der ihn kennt – bei Dateien, die über Authelia sonst
+      # zugriffsgeschützt sind.
+      OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD: "true"
       STORAGE_USERS_POSIX_WATCH_FS: "true"
       NATS_NATS_HOST: 0.0.0.0
       GATEWAY_GRPC_ADDR: 0.0.0.0:9142
@@ -93,12 +97,22 @@ services:
       COLLABORATION_APP_PRODUCT: "Collabora"
       COLLABORATION_APP_ADDR: https://${COLLABORA_SUBDOMAIN:-office}.${DOMAIN}
       COLLABORATION_APP_ICON: https://${COLLABORA_SUBDOMAIN:-office}.${DOMAIN}/favicon.ico
-      COLLABORATION_APP_INSECURE: "true"
-      COLLABORATION_CS3API_DATAGATEWAY_INSECURE: "true"
+      # TLS-Verifikation AN. Die beiden Schalter standen auf "true" und haben
+      # die Prüfung komplett abgeschaltet – obwohl mit ca-bundle.crt genau
+      # dafür ein Bundle existiert (System-CAs + lokale CA, erzeugt von
+      # nixos/modules/local-ca.nix; Grafana und Paperless nutzen es bereits).
+      # Der collaboration-Dienst spricht über HTTPS mit Collabora
+      # (office.<domain>) und dem OpenCloud-Datagateway.
+      COLLABORATION_APP_INSECURE: "false"
+      COLLABORATION_CS3API_DATAGATEWAY_INSECURE: "false"
+      # Go liest zusätzliche Wurzelzertifikate aus SSL_CERT_FILE.
+      SSL_CERT_FILE: /certs/ca-bundle.crt
       COLLABORATION_LOG_LEVEL: "info"
       OC_URL: https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}
     volumes:
       - opencloud_config:/etc/opencloud
+      # System-CAs + lokale CA, siehe SSL_CERT_FILE oben.
+      - /var/lib/apphost-ca/ca-bundle.crt:/certs/ca-bundle.crt:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.collaboration.entrypoints=websecure"
