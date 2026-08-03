@@ -45,7 +45,7 @@ services:
       - "traefik.http.routers.radicale.rule=Host(`${RADICALE_SUBDOMAIN:-cal}.${DOMAIN}`)"
       - "traefik.http.routers.radicale.entrypoints=websecure"
       - "traefik.http.services.radicale.loadbalancer.server.port=5232"
-      - "traefik.http.routers.radicale.middlewares=default-chain@file"
+      - "traefik.http.routers.radicale.middlewares=dav-chain@file"
       - "homepage.group=Tools"
       - "homepage.name=Kalender (Radicale)"
       - "homepage.icon=radicale.png"
