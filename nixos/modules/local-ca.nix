@@ -7,8 +7,12 @@
 # Paperless) beim Server-zu-Server-Token-Call NICHT vertrauen. Mit einer eigenen CA:
 #   - Traefik liefert ein von dieser CA signiertes Zertifikat aus
 #     (config/traefik/dynamic/tls.yml -> defaultCertificate, Mount /certs-local).
-#   - Die OIDC-Backends bekommen die CA gemountet und vertrauen ihr
-#     (NODE_EXTRA_CA_CERTS / REQUESTS_CA_BUNDLE / GF_..._TLS_CLIENT_CA).
+#   - Die OIDC-Backends bekommen die CA gemountet und vertrauen ihr.
+#     ACHTUNG beim Mechanismus: NODE_EXTRA_CA_CERTS (Immich) ERGÄNZT den
+#     Truststore, REQUESTS_CA_BUNDLE (Paperless) und GF_..._TLS_CLIENT_CA
+#     (Grafana) ERSETZEN ihn. Für die beiden erzeugt dieses Modul deshalb
+#     zusätzlich ca-bundle.crt = System-CAs + lokale CA; sonst bricht deren
+#     Token-Call, sobald Traefik ein Let's-Encrypt-Zertifikat ausliefert.
 #   - Importiert man local-ca.crt in Browser/Handy, sind auch dort alle
 #     Zertifikatswarnungen weg (Alias `ca` gibt die Datei aus).
 #
@@ -89,11 +93,28 @@ in {
         rm -f apphost.csr san.ext
       fi
 
-      # 3. Rechte:
+      # 3. Kombiniertes Bundle: System-CAs + lokale CA.
+      #    Grund: Optionen wie REQUESTS_CA_BUNDLE (Paperless) oder
+      #    GF_AUTH_GENERIC_OAUTH_TLS_CLIENT_CA (Grafana) ERSETZEN den
+      #    Truststore, sie ergänzen ihn nicht. Zeigen sie nur auf local-ca.crt,
+      #    funktioniert der OIDC-Token-Call zwar im rein lokalen Betrieb, bricht
+      #    aber in dem Moment, in dem Traefik ein Let's-Encrypt-Zertifikat
+      #    ausliefert (echte Domain + Cloudflare-Token – der Weg, den
+      #    install.sh ausdrücklich offenhält). Mit diesem Bundle gilt beides.
+      #    Wird bei jedem Lauf neu geschrieben, damit Aktualisierungen der
+      #    System-CAs mitkommen.
+      if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+        cat /etc/ssl/certs/ca-certificates.crt local-ca.crt > ca-bundle.crt.tmp
+        mv -f ca-bundle.crt.tmp ca-bundle.crt
+      else
+        cp -f local-ca.crt ca-bundle.crt
+      fi
+
+      # 4. Rechte:
       #    - local-ca.crt ist öffentlich -> 0644, jeder Container darf es lesen.
       #    - apphost.key/.crt liest der Traefik-Container (userns-root = ${toString remapBase}).
       #    - ca.key ist der Vertrauensanker -> nur root, nie gemountet.
-      chmod 0644 local-ca.crt apphost.crt
+      chmod 0644 local-ca.crt apphost.crt ca-bundle.crt
       chown ${toString remapBase}:${toString remapBase} apphost.key apphost.crt
       chmod 0640 apphost.key
       chmod 0600 ca.key

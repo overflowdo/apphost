@@ -330,6 +330,27 @@ Der Token wird im nächsten Schritt als `CF_DNS_API_TOKEN` in die `.env`-Datei e
 
 ![Beispielbild](docs/Cloudflare%20API%20Key.png)
 
+#### Nachträglicher Wechsel: lokal → echte Domain mit Let's Encrypt
+
+Der Cloudflare-Token ist optional. Ohne ihn läuft der Stack rein lokal: `apphost-local-ca.service` erzeugt eine eigene CA, Traefik liefert deren Zertifikat aus, und die OIDC-Backends vertrauen ihr über gemountete Zertifikatsdateien.
+
+Trägt man später Domain und Token in die `.env` ein, holt Traefik beim nächsten Start echte Zertifikate. Damit dabei auch die **Server-zu-Server**-Aufrufe (OIDC-Token/Userinfo von Grafana, Immich und Paperless gegen Authelia) weiter funktionieren, bekommen Paperless und Grafana nicht mehr die lokale CA allein gemountet, sondern `ca-bundle.crt` — die System-CAs **plus** die lokale CA:
+
+| Dienst | Variable | Verhalten |
+| --- | --- | --- |
+| Immich | `NODE_EXTRA_CA_CERTS` | **ergänzt** den Truststore |
+| Paperless | `REQUESTS_CA_BUNDLE` | **ersetzt** den Truststore → braucht das Bundle |
+| Grafana | `GF_AUTH_GENERIC_OAUTH_TLS_CLIENT_CA` | **ersetzt** den Truststore → braucht das Bundle |
+
+Ohne das Bundle würde der Token-Call bei Paperless und Grafana in dem Moment brechen, in dem Traefik ein Let's-Encrypt-Zertifikat ausliefert — die Dienste würden dann nur noch der lokalen CA vertrauen. Das Bundle erzeugt `apphost-local-ca.service` bei jedem Boot neu, damit Aktualisierungen der System-CAs mitkommen.
+
+Nach dem Eintragen von Domain und Token also:
+
+```bash
+sudo nixos-rebuild switch --flake path:/opt/monorepo#apphost   # Zertifikat + Bundle für die neue Domain
+up-all                                                         # Container mit neuen Werten neu erzeugen
+```
+
 ### .env konfigurieren
 
 Nach Abschluss der Installation (NixOS, Secure Boot, Bootloader) fragt das Skript noch die restlichen Werte für die `.env`-Datei ab:

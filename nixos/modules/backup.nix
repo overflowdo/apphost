@@ -21,7 +21,10 @@
   # systemd-Units gehören nicht dazu. node-exporter mit --collector.systemd
   # nachzurüsten wäre die Alternative, bräuchte aber den D-Bus-Socket im
   # Container und weicht dessen Isolation auf.
-  # Testen: sudo systemctl start apphost-notify-failure@apphost-db-backup.service
+  # Testen – der Instanzname ist der VOLLE Unit-Name, %n expandiert
+  # apphost-db-backup zu "apphost-db-backup.service". Der Testaufruf muss das
+  # nachbilden, sonst prüft man einen anderen Pfad als den Ernstfall:
+  #   sudo systemctl start 'apphost-notify-failure@apphost-db-backup.service.service'
   systemd.services."apphost-notify-failure@" = {
     description = "Report a failed unit (%i) to ntfy";
     path = [ pkgs.curl pkgs.systemd pkgs.coreutils pkgs.gnugrep ];

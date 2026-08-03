@@ -249,7 +249,19 @@
         exit 0
       fi
 
-      ${pkgs.aide}/bin/aide --check || true
+      # KEIN "|| true": AIDE meldet Funde über den Exit-Code (1 = neue,
+      # 2 = gelöschte, 4 = geänderte Dateien, kombinierbar; ab 14 interne
+      # Fehler). Mit "|| true" endete die Unit immer mit 0 und das OnFailure
+      # oben hätte nie ausgelöst – der Push-Kanal wäre für AIDE tot
+      # gewesen und ein Integritätsfund hätte nur in /var/log/aide.log
+      # gestanden. Das Skript läuft mit set -u ohne -e, deshalb explizit
+      # durchreichen.
+      ${pkgs.aide}/bin/aide --check
+      rc=$?
+      if [ "$rc" -ne 0 ]; then
+        echo "AIDE: Abweichungen oder Fehler festgestellt (exit $rc) – Details in /var/log/aide.log"
+      fi
+      exit "$rc"
     '';
     serviceConfig.Type = "oneshot";
   };
