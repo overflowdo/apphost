@@ -65,7 +65,13 @@ services:
       # Eigener Router nur für die Anmelde-Endpunkte: dort greift das strenge
       # Limit (5/s), während das Portal selbst (Dutzende Assets) am normalen
       # Limit hängt. Gleiches Muster wie bei vaultwarden-auth.
-      - "traefik.http.routers.authelia-login.rule=Host(`${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}`) && PathPrefix(`/api/firstfactor`, `/api/secondfactor`)"
+      # PathPrefix nimmt in Traefik v3 GENAU EIN Argument
+      # (pkg/muxer/http/matcher.go: expectNParameters(pathPrefix, 1)). Zwei
+      # Argumente lassen das Anlegen des Routers mit "unexpected number of
+      # parameters" scheitern – Traefik lädt den Rest normal weiter, und die
+      # Anfragen fielen still auf den regulären authelia-Router mit 50/s
+      # zurück. Mehrere Pfade brauchen eine Veroderung.
+      - "traefik.http.routers.authelia-login.rule=Host(`${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}`) && (PathPrefix(`/api/firstfactor`) || PathPrefix(`/api/secondfactor`))"
       - "traefik.http.routers.authelia-login.entrypoints=websecure"
       - "traefik.http.routers.authelia-login.priority=100"
       - "traefik.http.routers.authelia-login.service=authelia"
