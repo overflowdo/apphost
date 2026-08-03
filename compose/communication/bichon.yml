@@ -16,7 +16,7 @@ services:
       BICHON_HTTP_PORT: 8080
       BICHON_LOG_LEVEL: info
       BICHON_JSON_LOGS: "true"
-      BICHON_PUBLIC_URL: ${BICHON_SUBDOMAIN}.${DOMAIN}
+      BICHON_PUBLIC_URL: https://${BICHON_SUBDOMAIN:-bichon}.${DOMAIN}
       BICHON_ROOT_DIR: /data
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]

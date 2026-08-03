@@ -25,10 +25,19 @@ OUTPUT="/rendered/traefik.yml"
 
 # Nur die drei bekannten Platzhalter ersetzen; alle anderen $-Zeichen bleiben
 # unangetastet. Domain/E-Mail/Provider enthalten kein '|', daher als Trenner ok.
+#
+# Das '&' wird vorher maskiert: in der Ersetzung von sed steht '&' für den
+# gesamten Treffer. Eine ACME_EMAIL wie "a&b@example.de" hätte sonst
+# "${ACME_EMAIL}" statt der Adresse eingesetzt. Ebenso '\' und '|'.
+esc() { printf '%s' "$1" | sed -e 's/[\\&|]/\\\\&/g'; }
+DOMAIN_ESC="$(esc "$DOMAIN")"
+ACME_EMAIL_ESC="$(esc "$ACME_EMAIL")"
+ACME_DNS_PROVIDER_ESC="$(esc "$ACME_DNS_PROVIDER")"
+
 sed \
-    -e "s|\${DOMAIN}|${DOMAIN}|g" \
-    -e "s|\${ACME_EMAIL}|${ACME_EMAIL}|g" \
-    -e "s|\${ACME_DNS_PROVIDER}|${ACME_DNS_PROVIDER}|g" \
+    -e "s|\${DOMAIN}|${DOMAIN_ESC}|g" \
+    -e "s|\${ACME_EMAIL}|${ACME_EMAIL_ESC}|g" \
+    -e "s|\${ACME_DNS_PROVIDER}|${ACME_DNS_PROVIDER_ESC}|g" \
     "$TEMPLATE" > "$OUTPUT"
 
 echo "traefik-init: $OUTPUT gerendert (DOMAIN=${DOMAIN}, ACME_EMAIL=${ACME_EMAIL}, DNS=${ACME_DNS_PROVIDER})"

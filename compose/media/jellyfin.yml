@@ -13,7 +13,14 @@ services:
     volumes:
       - jellyfin_config:/config
       - jellyfin_cache:/cache
-      - ${MEDIA_DIR:-/mnt/media}/jellyfin:/media:ro
+      # Fest /mnt/media wie überall sonst im Stack. Vorher stand hier als
+      # EINZIGER Stelle ${MEDIA_DIR:-/mnt/media} – das suggerierte einen frei
+      # wählbaren Pfad, den Immich, Paperless, OpenCloud und Radicale gar nicht
+      # kennen (die haben /mnt/media hart verdrahtet, ebenso
+      # nixos/modules/media-disk.nix und media-dirs.nix). Wer MEDIA_DIR änderte,
+      # zerriss den Stack. Der Mountpunkt gehört genau an eine Stelle:
+      # nixos/modules/media-disk.nix.
+      - /mnt/media/jellyfin:/media:ro
       # Hardware-Transcoding
       # - /dev/dri:/dev/dri
     environment:
