@@ -41,7 +41,7 @@
     },
     {
       "description": "Unpinned Container-Images sofort automatisch auf Digest pinnen, alle in einem MR",
-      "matchUpdateTypes": ["pinDigest"],
+      "matchUpdateTypes": ["pinDigest", "digest"],
       "groupName": "Pin unpinned container image digests",
       "groupSlug": "pin-container-digests",
       "automerge": true,
