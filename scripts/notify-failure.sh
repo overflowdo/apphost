@@ -21,7 +21,7 @@ UNIT="${1:-unbekannt}"
 ROOT_DIR="${ROOT_DIR:-/opt/monorepo}"
 ENV_FILE="$ROOT_DIR/.env"
 PW_FILE="$ROOT_DIR/secrets/alertmanager_ntfy_password"
-CA_FILE="/var/lib/apphost-ca/local-ca.crt"
+CA_FILE="${CA_FILE:-/var/lib/apphost-ca/local-ca.crt}"
 
 read_env() {  # <key>
     { grep -m1 "^[[:space:]]*$1=" "$ENV_FILE" 2>/dev/null || true; } \
@@ -78,13 +78,29 @@ URL="https://${NTFY_SUBDOMAIN}.${DOMAIN}/apphost-critical"
 # mit echter Domain und Let's-Encrypt-Zertifikat läuft (der Weg, den install.sh
 # ausdrücklich offenhält). Ein festes --cacert hätte dort die Verifikation
 # gebrochen. Reihenfolge also: normaler Weg zuerst, lokale CA als Rückfall.
-if curl_config | curl -K - "${CURL_ARGS[@]}" "$URL" >/dev/null 2>&1; then
+#
+# curls stderr wird je Versuch eingefangen und NUR ausgegeben, wenn am Ende
+# nichts durchkam. Sonst stünde im Journal bloß "fehlgeschlagen" ohne Grund –
+# und ob es an TLS, Auth, DNS oder ntfy selbst lag, wäre nicht mehr zu sehen.
+# "2>&1 >/dev/null" (in dieser Reihenfolge) leitet stderr in die Substitution
+# und wirft stdout weg.
+err_default="$(curl_config | curl -K - "${CURL_ARGS[@]}" "$URL" 2>&1 >/dev/null)"
+rc_default=$?
+
+if [[ "$rc_default" -eq 0 ]]; then
     echo "apphost-notify-failure: Meldung an ntfy zugestellt." >&2
-elif [[ -f "$CA_FILE" ]] \
-     && curl_config | curl -K - "${CURL_ARGS[@]}" --cacert "$CA_FILE" "$URL" >/dev/null 2>&1; then
-    echo "apphost-notify-failure: Meldung an ntfy zugestellt (lokale CA)." >&2
+elif [[ -f "$CA_FILE" ]]; then
+    err_localca="$(curl_config | curl -K - "${CURL_ARGS[@]}" --cacert "$CA_FILE" "$URL" 2>&1 >/dev/null)"
+    if [[ $? -eq 0 ]]; then
+        echo "apphost-notify-failure: Meldung an ntfy zugestellt (lokale CA)." >&2
+    else
+        echo "apphost-notify-failure: Zustellung an ntfy fehlgeschlagen." >&2
+        echo "  mit System-Truststore: ${err_default:-（keine Ausgabe）}" >&2
+        echo "  mit lokaler CA:        ${err_localca:-（keine Ausgabe）}" >&2
+    fi
 else
     echo "apphost-notify-failure: Zustellung an ntfy fehlgeschlagen." >&2
+    echo "  curl: ${err_default:-（keine Ausgabe）}" >&2
 fi
 
 exit 0
