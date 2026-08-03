@@ -27,7 +27,7 @@ line "Nutzer"   "$(env_val AUTHELIA_ADMIN_USER)"
 line "Passwort" "$(env_val AUTHELIA_ADMIN_PASSWORD)"
 echo
 echo "▶ App-eigene Logins        (Nutzer / Passwort)"
-line "Grafana"    "$(env_val GRAFANA_ADMIN_USER) / $(env_val GRAFANA_ADMIN_PASSWORD)  [NOTFALL – Login-Formular ist aus, Anmeldung läuft über Authelia/OIDC]"
+line "Grafana"    "$(env_val GRAFANA_ADMIN_USER) / $(env_val GRAFANA_ADMIN_PASSWORD)  [derzeit NICHT nutzbar: Anmeldung nur über Authelia/OIDC. Erst verwendbar, nachdem GF_AUTH_DISABLE_LOGIN_FORM in compose/monitoring/grafana.yml auf false gesetzt und Grafana neu erzeugt wurde.]"
 line "OpenCloud"  "admin / $(env_val OPENCLOUD_ADMIN_PASSWORD)"
 line "ntfy"       "admin / $(env_val NTFY_ADMIN_PASSWORD)"
 line "Bichon"     "admin / admin@bichon   (Image-Standard; 1. Login ändern: Settings->Profile)"

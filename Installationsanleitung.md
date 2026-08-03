@@ -184,7 +184,15 @@ Prüfen lässt sich der Name nach dem ersten Boot in der VM mit `ls -l /dev/disk
 > mountpoint /mnt/media && df -h /mnt/media
 > ```
 >
-> Wurden bereits falsche Verzeichnisse angelegt: Stack stoppen (`down`), `sudo rm -rf /mnt/media/*` **auf der Systemplatte**, Platte einhängen, `sudo systemctl start apphost-media-dirs`, dann `up`.
+> Wurden bereits falsche Verzeichnisse auf der Systemplatte angelegt: Stack stoppen (`down`), dann **mit Schutzabfrage** aufräumen. Der Guard ist kein Zierrat – ohne ihn löscht derselbe Befehl bei eingehängter Platte sämtliche Fotos und Dokumente:
+>
+> ```bash
+> down
+> mountpoint -q /mnt/media && { echo "ABBRUCH: Platte ist eingehängt, hier steht nichts zum Aufräumen."; } || sudo rm -rf /mnt/media/*
+> # Platte einhängen (oder Host neu starten), dann:
+> sudo systemctl start apphost-media-dirs
+> up
+> ```
 
 ---
 
