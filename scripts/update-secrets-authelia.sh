@@ -207,28 +207,47 @@ EOF
 
 if [[ -f "$OUTPUT_USERS" ]] && grep -q "^users:" "$OUTPUT_USERS"; then
     echo "  users.yml existiert – nur den Eintrag '${AUTHELIA_ADMIN_USER}' aktualisieren."
-    # Python statt sed: der Nutzerblock ist mehrzeilig und einrückungsabhängig.
-    ADMIN_USER="$AUTHELIA_ADMIN_USER" ADMIN_BLOCK="$ADMIN_BLOCK" \
-    python3 - "$OUTPUT_USERS" <<'PYEOF'
-import os, re, sys
-path = sys.argv[1]
-user = os.environ["ADMIN_USER"]
-block = os.environ["ADMIN_BLOCK"].rstrip("\n") + "\n"
-text = open(path).read()
+    # awk statt python3: python3 gibt es weder auf dem Live-ISO noch auf dem
+    # installierten Host (steht nicht in environment.systemPackages). Der Rest
+    # dieser Datei wrappt jedes externe Werkzeug in nix-shell -p – awk ist
+    # dagegen überall da und braucht keinen Wrapper.
+    #
+    # Der Block wird über eine Datei übergeben, nicht über awk -v: der
+    # argon2-Hash enthält '$' und die Zeilen enthalten Anfuehrungszeichen.
+    BLOCK_FILE="$(mktemp)"
+    trap 'rm -f "$BLOCK_FILE"' EXIT
+    printf '%s\n' "$ADMIN_BLOCK" > "$BLOCK_FILE"
 
-# Den Block des Admin-Nutzers finden: Zeile "  <user>:" bis zur nächsten
-# Zeile mit derselben Einrueckung (oder Dateiende).
-pattern = re.compile(
-    r"^[ \t]{2}%s:[ \t]*\n(?:(?:[ \t]{3,}.*|[ \t]*)\n)*" % re.escape(user),
-    re.MULTILINE,
-)
-if pattern.search(text):
-    text = pattern.sub(block, text, count=1)
-else:
-    # Nutzer noch nicht vorhanden -> hinten anhaengen.
-    text = text.rstrip("\n") + "\n" + block
-open(path, "w").write(text)
-PYEOF
+    TMP_USERS="$(mktemp)"
+    # Ersetzt den Block des Admin-Nutzers und lässt alle anderen unangetastet.
+    # Erkannt wird er an einer Zeile "  <user>:" mit genau zwei Leerzeichen
+    # Einrückung – so schreibt dieses Skript sie. Weicht die Einrückung ab
+    # (von Hand anders formatiert), greift der END-Zweig und hängt den Block
+    # hinten an; das fällt beim Start von Authelia sofort auf (doppelter Key).
+    awk -v user="$AUTHELIA_ADMIN_USER" -v blockfile="$BLOCK_FILE" '
+        function emit(   line) {
+            while ((getline line < blockfile) > 0) print line
+            close(blockfile)
+        }
+        # Start des gesuchten Nutzerblocks
+        $0 == "  " user ":" { emit(); skip = 1; found = 1; next }
+        # Ende: nächster Schluessel auf gleicher oder höherer Ebene
+        skip && /^[ ]{2}[^ ]/ { skip = 0 }
+        skip && /^[^ ]/       { skip = 0 }
+        skip { next }
+        { print }
+        END { if (!found) emit() }
+    ' "$OUTPUT_USERS" > "$TMP_USERS"
+
+    # Nur übernehmen, wenn dabei etwas Sinnvolles herauskam.
+    if [[ -s "$TMP_USERS" ]] && grep -q "^users:" "$TMP_USERS"; then
+        cat "$TMP_USERS" > "$OUTPUT_USERS"
+    else
+        rm -f "$TMP_USERS"
+        echo "ERROR: Aktualisierung von $OUTPUT_USERS fehlgeschlagen – Datei unverändert." >&2
+        exit 1
+    fi
+    rm -f "$TMP_USERS"
 else
     # Erstanlage. Erst löschen: bei regen-secrets läuft dieses Skript als
     # apphost (nicht root); gehört eine alte Datei der remapped Container-UID,
@@ -241,20 +260,14 @@ else
 # Der Eintrag '${AUTHELIA_ADMIN_USER}' wird von
 # scripts/update-secrets-authelia.sh bei jedem Lauf überschrieben (Passwort aus
 # der .env). ALLE ANDEREN Einträge bleiben erhalten – weitere Nutzer können
-# hier also von Hand ergänzt werden. Passwort-Hashes erzeugt:
+# hier also von Hand ergänzt werden (Einrückung: genau zwei Leerzeichen).
+# Passwort-Hashes erzeugt:
 #   docker exec authelia authelia crypto hash generate argon2 --password '<pw>'
 # Eine Admin-UI zum Anlegen von Nutzern gibt es beim file-Backend nicht.
 users:
 ${ADMIN_BLOCK}
 EOF
 fi
-# users.yml enthält nur einen Passwort-HASH und wird bei jedem Lauf neu
-# geschrieben. Damit es der Authelia-Container (userns-remap -> Host-UID 101000,
-# aus Sicht der Datei "other") lesen kann, OHNE dass wir es der Container-UID
-# übereignen (was root bräuchte und regen-secrets als apphost verbieten würde),
-# ist es host-owned + world-readable (0644). Auf einem Single-Admin-Host ist ein
-# world-lesbarer argon2id-Hash vertretbar (argon2id, nicht bcrypt – siehe
-# argon2_hash() oben und config/authelia/configuration.yml).
 chmod 0644 "$OUTPUT_USERS"
 echo "  -> $OUTPUT_USERS (0644, host-owned)"
 
