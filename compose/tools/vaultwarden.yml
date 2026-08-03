@@ -55,6 +55,27 @@ services:
       - "traefik.http.routers.vaultwarden-auth.priority=100"
       - "traefik.http.routers.vaultwarden-auth.service=vaultwarden"
       - "traefik.http.routers.vaultwarden-auth.middlewares=auth-endpoint-chain@file"
+      # /admin zusätzlich hinter Authelia mit Zwei-Faktor-Pflicht.
+      #
+      # Das Panel kann Konten löschen, Einladungen verschicken, 2FA einzelner
+      # Nutzer abschalten und die Konfiguration einsehen – davor stand bisher
+      # allein ADMIN_TOKEN, ein statisches Bearer-Token ohne zweiten Faktor,
+      # ohne strenges Rate-Limit und ohne fail2ban (der Filter zählt nur die
+      # 400er von /identity/connect/token, Fehlversuche auf /admin waren
+      # unsichtbar). Während Prometheus und das Traefik-Dashboard two_factor
+      # verlangen, hing die mächtigste Oberfläche im Stack an einer einzigen
+      # Schranke. Genau diese Asymmetrie ist der Punkt – das Token selbst ist
+      # als Argon2-Hash über 32 Zufalls-Hex nicht ratbar.
+      #
+      # priority 110 > 100 (vaultwarden-auth) > Standard, damit der
+      # spezifischste Router zuerst greift. Bitwarden-Clients berühren /admin
+      # nie, für sie ändert sich nichts. Die Zwei-Faktor-Regel steht in
+      # config/authelia/configuration.yml (resources: ^/admin).
+      - "traefik.http.routers.vaultwarden-admin.rule=Host(`${VAULTWARDEN_SUBDOMAIN:-vault}.${DOMAIN}`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.vaultwarden-admin.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden-admin.priority=110"
+      - "traefik.http.routers.vaultwarden-admin.service=vaultwarden"
+      - "traefik.http.routers.vaultwarden-admin.middlewares=authelia-admin-chain@file"
       - "homepage.group=Tools"
       - "homepage.name=Vaultwarden"
       - "homepage.icon=vaultwarden.png"

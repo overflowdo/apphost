@@ -249,6 +249,13 @@
     /opt/monorepo/compose NORMAL
     /opt/monorepo/scripts NORMAL
     /opt/monorepo/nixos NORMAL
+    # Einzeln statt pauschal /opt/monorepo: dort liegen auch .env, secrets/ und
+    # data/, die sich legitim ändern. Ohne diese drei Zeilen bliebe eine
+    # zusätzliche include:-Zeile in docker-compose.yml – also ein kompletter
+    # neuer Container – unbemerkt.
+    /opt/monorepo/docker-compose.yml NORMAL
+    /opt/monorepo/flake.nix NORMAL
+    /opt/monorepo/flake.lock NORMAL
     /root NORMAL
     /home/apphost/.ssh NORMAL
 

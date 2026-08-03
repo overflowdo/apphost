@@ -10,6 +10,10 @@ services:
     environment:
       domain: "${OPENCLOUD_SUBDOMAIN:-cloud}\\.${DOMAIN}"
       aliasgroup1: "https://${WOPISERVER_SUBDOMAIN:-wopi}.${DOMAIN}:443"
+      # admin_console.enable=false: unter
+      # office.<domain>/browser/dist/admin/admin.html liegt sonst Collaboras
+      # Admin-Konsole, abgesichert allein durch COLLABORA_ADMIN_PASSWORD.
+      # Gebraucht wird sie hier von niemandem – OpenCloud spricht nur WOPI.
       extra_params: |
         --o:ssl.enable=false \
         --o:ssl.ssl_verification=true \
@@ -17,7 +21,8 @@ services:
         --o:welcome.enable=false \
         --o:net.frame_ancestors=https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN} \
         --o:net.lok_allow.host[14]=https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN} \
-        --o:home_mode.enable=false
+        --o:home_mode.enable=false \
+        --o:admin_console.enable=false
       DONT_GEN_SSL_CERT: "YES"
       username: ${COLLABORA_ADMIN_USER:-admin}
       password: ${COLLABORA_ADMIN_PASSWORD:?}
@@ -84,4 +89,9 @@ services:
       - "traefik.http.middlewares.collabora-headers.headers.customResponseHeaders.Server="
       - "traefik.http.middlewares.collabora-headers.headers.customResponseHeaders.X-Powered-By="
       - "traefik.http.middlewares.collabora-headers.headers.customRequestHeaders.X-Forwarded-Proto=https"
-      - "traefik.http.routers.collabora.middlewares=collabora-headers,compress@file"
+      # rate-limit/in-flight standen hier als einzigem Router im Stack nicht davor.
+      # Collabora ist gleichzeitig der am schwächsten isolierte Container
+      # (seccomp/apparmor unconfined, SYS_ADMIN) – ausgerechnet der war also
+      # ungedrosselt erreichbar. OpenCloud läuft mit denselben zwei
+      # Middlewares, der Editor kommt damit aus.
+      - "traefik.http.routers.collabora.middlewares=rate-limit@file,in-flight@file,collabora-headers,compress@file"

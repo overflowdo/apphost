@@ -175,6 +175,20 @@ http:
           - in-flight
           - security-headers
           - compress
+    # Wie authelia-chain, aber mit dem strengen Anmelde-Rate-Limit. Für
+    # Oberflächen, die selbst Konten verwalten können und deshalb nicht nur
+    # hinter dem jeweiligen App-Passwort stehen sollen – aktuell Vaultwardens
+    # /admin. Die Zwei-Faktor-Pflicht steht in config/authelia/configuration.yml,
+    # nicht hier: Traefik entscheidet nur, DASS gefragt wird, Authelia WIE streng.
+    authelia-admin-chain:
+      chain:
+        middlewares:
+          - rate-limit-auth
+          - in-flight
+          - strip-remote-user
+          - forward-auth
+          - security-headers
+          - compress
     # Kette für Radicale (CalDAV/CardDAV).
     dav-chain:
       chain:

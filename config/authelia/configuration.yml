@@ -47,6 +47,13 @@ access_control:
     # Authelia-Portal selbst: kein Auth
     - domain: '{{ env "AUTH_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
       policy: bypass
+    # Vaultwarden: NUR /admin geht über ForwardAuth, der Tresor selbst nicht
+    # (die Bitwarden-Clients können kein Browser-SSO). Diese Regel muss vor
+    # allen breiteren stehen – Authelia nimmt die erste passende.
+    - domain: '{{ env "VAULTWARDEN_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+      resources:
+        - '^/admin'
+      policy: two_factor
     # Admin-Oberflächen: zweiter Faktor (TOTP/WebAuthn sind oben konfiguriert und
     # waren bisher nirgends gefordert). Wer hier reinkommt, sieht die komplette
     # Infrastruktur bzw. kann sie umkonfigurieren.
