@@ -17,7 +17,7 @@
 #     Zertifikatswarnungen weg (Alias `ca` gibt die Datei aus).
 #
 # Kein Pi-hole nötig: reine lokale Krypto. Idempotent – bestehende Schlüssel bleiben.
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   # Fallback-Domain. Die tatsächliche Domain kommt zur Laufzeit aus
   # /opt/monorepo/.env (DOMAIN=...) – dieselbe Quelle, aus der auch Traefik und
@@ -33,6 +33,14 @@ in {
     description = "Generate local CA + server certificate for the local domain";
     wantedBy = [ "multi-user.target" ];
     before   = [ "docker.service" ];
+    # Der Dienst ist oneshot + RemainAfterExit, wird also nur neu gestartet, wenn
+    # sich seine Definition ändert. Aktualisieren sich NUR die System-CAs, bliebe
+    # ca-bundle.crt (siehe Schritt 3) bis zum nächsten Reboot auf dem alten
+    # Stand. Der Trigger auf das System-CA-Bundle nagelt das fest: ändert es
+    # sich, läuft der Dienst beim nächsten `nixos-rebuild switch` erneut.
+    restartTriggers = lib.optional
+      (config.environment.etc ? "ssl/certs/ca-certificates.crt")
+      config.environment.etc."ssl/certs/ca-certificates.crt".source;
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
