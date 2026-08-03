@@ -20,10 +20,13 @@ ping:
 # OpenCloud/Collabora mit kodierten Slashes), gezielt EINEN Schalter am
 # websecure-Entrypoint wieder aktivieren – nicht wieder alle.
 #
-# forwardedHeaders.trustedIPs: bewusst OHNE 192.168.0.0/16. Sonst darf jedes
-# LAN-Gerät sein eigenes X-Forwarded-For setzen und damit Authelias
-# Brute-Force-Regulation umgehen und die Access-Logs verfälschen. Container
-# (172.16.0.0/12) müssen weiterhin vertrauenswürdig sein.
+# forwardedHeaders.trustedIPs: nur noch Loopback. Vor Traefik steht kein
+# weiterer Proxy – LAN-Clients kommen per DNAT mit ihrer echten Adresse an,
+# Container mit ihrer Container-Adresse. In beiden Fällen ist die Peer-Adresse
+# die richtige Quelle, ein vom Client mitgeschicktes X-Forwarded-For ist es nie.
+# Stand hier 192.168.0.0/16, durfte jedes LAN-Gerät seine Client-IP frei setzen;
+# mit 172.16.0.0/12 durfte das jeder der ~20 Container. Beides hebelt Authelias
+# Brute-Force-Regulation aus und fälscht das Access-Log, das fail2ban liest.
 entryPoints:
   # HTTP -> Redirect auf HTTPS
   web:
@@ -36,7 +39,7 @@ entryPoints:
           permanent: true
     forwardedHeaders:
       insecure: false
-      trustedIPs: ["127.0.0.1/8", "::1/128", "172.16.0.0/12"]
+      trustedIPs: ["127.0.0.1/8", "::1/128"]
   # HTTPS – TLS 1.3 + HTTP/3 (QUIC/UDP)
   websecure:
     address: ":8443"
@@ -52,7 +55,7 @@ entryPoints:
               - "*.${DOMAIN}"
     forwardedHeaders:
       insecure: false
-      trustedIPs: ["127.0.0.1/8", "::1/128", "172.16.0.0/12"]
+      trustedIPs: ["127.0.0.1/8", "::1/128"]
     transport:
       respondingTimeouts:
         readTimeout: "30s"
@@ -111,7 +114,11 @@ accessLog:
   format: "json"
   bufferingSize: 100
   filters:
-    statusCodes: ["400-599"]
+    # KEIN statusCodes-Filter mehr. Vorher wurden nur 400-599 protokolliert –
+    # für fail2ban reichte das, für die Frage "wer hat wann welche Datei
+    # geholt" gab es damit gar keine Datenbasis, weder in der Datei noch in
+    # Loki. Rotation ist eingerichtet (logrotate, 7 Tage, siehe
+    # nixos/modules/security.nix), die Menge ist also begrenzt.
     retryAttempts: true
   fields:
     headers:

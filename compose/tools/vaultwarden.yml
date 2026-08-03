@@ -45,6 +45,16 @@ services:
       - "traefik.http.routers.vaultwarden.entrypoints=websecure"
       - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
       - "traefik.http.routers.vaultwarden.middlewares=default-chain@file"
+      # Eigener Router nur für den Login-Endpunkt: dort greift das strenge
+      # Rate-Limit (5/s), ohne das Laden des Web-Vaults (Dutzende Assets) zu
+      # drosseln. Vaultwarden hat keinen eigenen Brute-Force-Schutz; das
+      # fail2ban-Jail fängt zusätzlich die 400er dieses Pfades ab
+      # (siehe nixos/modules/security.nix).
+      - "traefik.http.routers.vaultwarden-auth.rule=Host(`${VAULTWARDEN_SUBDOMAIN:-vault}.${DOMAIN}`) && PathPrefix(`/identity/connect/token`)"
+      - "traefik.http.routers.vaultwarden-auth.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden-auth.priority=100"
+      - "traefik.http.routers.vaultwarden-auth.service=vaultwarden"
+      - "traefik.http.routers.vaultwarden-auth.middlewares=auth-endpoint-chain@file"
       - "homepage.group=Tools"
       - "homepage.name=Vaultwarden"
       - "homepage.icon=vaultwarden.png"
