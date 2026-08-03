@@ -159,6 +159,49 @@ jobs:
             -v "$PWD/ci-secrets/ntfy_password:/run/secrets/ntfy_password:ro" \
             --entrypoint amtool prom/alertmanager:v0.32.1 \
             check-config /etc/alertmanager/config.yml
+      - name: ContainerDown-Regeln gegen den Stack abgleichen
+        # config/prometheus/rules/alerts.yml hat je erwartetem Container eine
+        # absent()-Regel. Diese Liste läuft ohne Abgleich zwangsläufig
+        # auseinander: ein neuer Dienst ohne Regel wird nie vermisst, ein
+        # entfernter Dienst alarmiert für immer.
+        run: |
+          set -euo pipefail
+          sed -e 's/^\(PAPERLESS_REDIS_PASSWORD\)=.*/\1=ci/' .env.example > .env
+          {
+            echo "CF_DNS_API_TOKEN=ci"; echo "IMMICH_DB_PASSWORD=ci"
+            echo "IMMICH_JWT_SECRET=ci"; echo "PAPERLESS_SECRET_KEY=ci"
+            echo "PAPERLESS_REDIS_PASSWORD=ci"; echo "OPENCLOUD_ADMIN_PASSWORD=ci"
+            echo "COLLABORA_ADMIN_PASSWORD=ci"; echo "GRAFANA_ADMIN_PASSWORD=ci"
+            echo "GRAFANA_SECRET_KEY=ci"; echo "VAULTWARDEN_ADMIN_TOKEN=ci"
+          } >> .env
+          mkdir -p secrets
+          touch secrets/authelia.env secrets/authelia_oidc_jwks.pem \
+                secrets/authelia_users.yml secrets/ntfy.env \
+                secrets/alertmanager_ntfy_password secrets/radicale_users \
+                secrets/oidc-grafana.env secrets/oidc-paperless.env
+          docker compose config > /tmp/rendered.yml
+          python3 - <<'PYEOF'
+          import re, yaml
+          rendered = yaml.safe_load(open("/tmp/rendered.yml"))
+          # Alles ausser den Einmal-Containern (restart: "no").
+          erwartet = {
+              svc.get("container_name", name)
+              for name, svc in rendered["services"].items()
+              if svc.get("restart") not in (None, "no")
+          }
+          regeln = set(re.findall(
+              r'absent\(container_last_seen\{name="([^"]+)"\}\)',
+              open("config/prometheus/rules/alerts.yml").read()))
+          fehlend, ueberzaehlig = erwartet - regeln, regeln - erwartet
+          if fehlend:
+              print("::error::Kein ContainerDown-Alert fuer:", ", ".join(sorted(fehlend)))
+          if ueberzaehlig:
+              print("::error::Alert fuer nicht (mehr) vorhandene Container:",
+                    ", ".join(sorted(ueberzaehlig)))
+          if fehlend or ueberzaehlig:
+              raise SystemExit(1)
+          print(f"{len(regeln)} ContainerDown-Regeln, deckungsgleich mit dem Stack.")
+          PYEOF
       - name: alloy fmt (Syntaxprüfung)
         # Bewusst OHNE --test: das schlägt auch bei reinen Formatierungs-
         # unterschieden fehl (Einrückung, Ausrichtung der =). Uns interessiert
