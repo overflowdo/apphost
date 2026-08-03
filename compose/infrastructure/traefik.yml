@@ -90,6 +90,9 @@ services:
       traefik-public:
         ipv4_address: 172.23.1.2
       socket-proxy: {}
+      # Fuer Dienste, die dem Remote-User-Header vertrauen (aktuell Grocy) und
+      # deshalb nicht im flachen traefik-public stehen duerfen.
+      sso-header-network: {}
     ports:
       - "80:8081"
       - "443:8443"
