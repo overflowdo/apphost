@@ -252,12 +252,17 @@
       # KEIN "|| true": AIDE meldet Funde über den Exit-Code (1 = neue,
       # 2 = gelöschte, 4 = geänderte Dateien, kombinierbar; ab 14 interne
       # Fehler). Mit "|| true" endete die Unit immer mit 0 und das OnFailure
-      # oben hätte nie ausgelöst – der Push-Kanal wäre für AIDE tot
-      # gewesen und ein Integritätsfund hätte nur in /var/log/aide.log
-      # gestanden. Das Skript läuft mit set -u ohne -e, deshalb explizit
-      # durchreichen.
-      ${pkgs.aide}/bin/aide --check
-      rc=$?
+      # oben hätte nie ausgelöst – der Push-Kanal wäre für AIDE tot gewesen und
+      # ein Integritätsfund hätte nur in /var/log/aide.log gestanden.
+      #
+      # Die Form "|| rc=$?" ist nötig, weil NixOS systemd.services.<n>.script
+      # mit "set -e" wrappt (makeJobScript): ein blankes `aide --check` würde
+      # bei einem Fund SOFORT abbrechen. Die Unit endete zwar trotzdem mit dem
+      # richtigen Exit-Code, aber die erklärende Zeile unten – die
+      # notify-failure.sh aus dem Journal mitschickt – käme nie zustande.
+      # Ein Befehl links von "||" ist von set -e ausgenommen.
+      rc=0
+      ${pkgs.aide}/bin/aide --check || rc=$?
       if [ "$rc" -ne 0 ]; then
         echo "AIDE: Abweichungen oder Fehler festgestellt (exit $rc) – Details in /var/log/aide.log"
       fi
