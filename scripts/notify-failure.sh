@@ -84,14 +84,13 @@ URL="https://${NTFY_SUBDOMAIN}.${DOMAIN}/apphost-critical"
 # und ob es an TLS, Auth, DNS oder ntfy selbst lag, wäre nicht mehr zu sehen.
 # "2>&1 >/dev/null" (in dieser Reihenfolge) leitet stderr in die Substitution
 # und wirft stdout weg.
-err_default="$(curl_config | curl -K - "${CURL_ARGS[@]}" "$URL" 2>&1 >/dev/null)"
-rc_default=$?
-
-if [[ "$rc_default" -eq 0 ]]; then
+# Die Zuweisung steht direkt in der if-Bedingung: so entscheidet der Exit-Status
+# des Kommandos, und die Ausgabe landet trotzdem in der Variablen. Ein separates
+# "$?" danach wäre brüchig (und ShellCheck SC2181 weist zu Recht darauf hin).
+if err_default="$(curl_config | curl -K - "${CURL_ARGS[@]}" "$URL" 2>&1 >/dev/null)"; then
     echo "apphost-notify-failure: Meldung an ntfy zugestellt." >&2
 elif [[ -f "$CA_FILE" ]]; then
-    err_localca="$(curl_config | curl -K - "${CURL_ARGS[@]}" --cacert "$CA_FILE" "$URL" 2>&1 >/dev/null)"
-    if [[ $? -eq 0 ]]; then
+    if err_localca="$(curl_config | curl -K - "${CURL_ARGS[@]}" --cacert "$CA_FILE" "$URL" 2>&1 >/dev/null)"; then
         echo "apphost-notify-failure: Meldung an ntfy zugestellt (lokale CA)." >&2
     else
         echo "apphost-notify-failure: Zustellung an ntfy fehlgeschlagen." >&2

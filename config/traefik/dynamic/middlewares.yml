@@ -98,7 +98,7 @@ http:
           Remote-Email: ""
     # OpenCloud bettet Collabora als Cross-Origin-Iframe (office.<domain>) ein.
     # Mit COEP: require-corp müsste dieser Frame (und alle seine Ressourcen)
-    # einen CORP-Header liefern. Dadurch können externe Ressourcen oft nicht richtig geladen werden, die hier benötigt werden. 
+    # einen CORP-Header liefern. Dadurch können externe Ressourcen oft nicht richtig geladen werden, die hier benötigt werden.
     opencloud-headers:
       headers:
         stsSeconds: 63072000
