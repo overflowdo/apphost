@@ -116,10 +116,23 @@
         };
       };
 
-      # Traefik: 401er (Authelia-ForwardAuth, Radicale-Basic-Auth, Vaultwarden).
-      # Traefik loggt jetzt zusätzlich in eine Datei (config/traefik/traefik.template.yml
-      # -> accessLog.filePath), die per Bind-Mount auf /var/log/traefik liegt;
-      # vorher ging alles nur nach stdout und der logpath zeigte ins Leere.
+      # Traefik: fehlgeschlagene Anmeldungen (Authelia-ForwardAuth,
+      # Radicale-Basic-Auth, Vaultwarden).
+      #
+      # WICHTIG – eigener Hook: fail2ban hängt seine Kette per Default in den
+      # input-Hook. Traffic auf 80/443 wird von Docker aber in prerouting per
+      # DNAT auf den Traefik-Container umgeschrieben und läuft danach über
+      # FORWARD; der input-Hook sieht ihn nie. Ein Ban blieb damit für alles
+      # hinter Traefik wirkungslos – Authelia-Login, Radicale, Vaultwarden,
+      # Jellyfin. Nur das sshd-Jail unten funktionierte, weil sshd ein echter
+      # Host-Dienst ist.
+      #
+      # chain_priority -150 sorgt dafür, dass die Kette VOR den
+      # Docker-Regeln und vor dem eigenen forward-Chain aus modules/networking.nix
+      # (Priorität 0) greift. Die Parameter sind Init-Optionen von fail2bans
+      # eigener nftables-Action, es ist also keine selbstgebaute Action nötig.
+      #
+      # Prüfen: sudo nft list table inet f2b-table
       traefik-auth = {
         settings = {
           enabled  = true;
@@ -129,6 +142,7 @@
           findtime = "10m";
           bantime  = "1h";
           filter   = "traefik-auth";
+          action   = ''nftables-multiport[name=traefik-auth, port="80,443", protocol=tcp, chain=f2b-forward, chain_hook=forward, chain_priority=-150]'';
         };
       };
     };
@@ -142,9 +156,16 @@
   # die JSON-Felder: "ClientHost":"<IP>" ... "DownstreamStatus":401.
   # Die Reihenfolge der Felder ist bei Traefik stabil (ClientHost vor Status);
   # zur Sicherheit erlaubt .* beliebige Felder dazwischen.
+  #
+  # Zweite Zeile für Vaultwarden: das antwortet auf einen falschen Login NICHT
+  # mit 401, sondern mit 400 (invalid_grant, so will es OAuth2). Ein pauschales
+  # 400 wäre viel zu breit – jede fehlerhafte Anfrage im Stack würde zählen –,
+  # deshalb eingegrenzt auf den Token-Endpunkt. RequestPath ist das Feld, unter
+  # dem Traefik den Pfad ablegt.
   environment.etc."fail2ban/filter.d/traefik-auth.conf".text = ''
     [Definition]
     failregex = ^.*"ClientHost":"<HOST>".*"DownstreamStatus":(401|403).*$
+                ^.*"ClientHost":"<HOST>".*"RequestPath":"/identity/connect/token".*"DownstreamStatus":400.*$
     ignoreregex =
     datepattern = "StartUTC":"%%Y-%%m-%%dT%%H:%%M:%%S
   '';
@@ -177,7 +198,14 @@
     # hash-adressiert und read-only.
     /boot NORMAL
     /etc NORMAL
+    # Nicht nur config/: aus compose/ und scripts/ laufen Dinge als root
+    # (systemd-Timer rufen backup-databases.sh und notify-failure.sh direkt aus
+    # diesem Verzeichnis auf). Eine Änderung dort ist genauso relevant wie eine
+    # in /etc.
     /opt/monorepo/config NORMAL
+    /opt/monorepo/compose NORMAL
+    /opt/monorepo/scripts NORMAL
+    /opt/monorepo/nixos NORMAL
     /root NORMAL
     /home/apphost/.ssh NORMAL
 
