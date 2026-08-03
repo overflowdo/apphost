@@ -3,7 +3,7 @@ volumes:
   loki_data: {name: apphost_loki_data}
 services:
   loki:
-    image: grafana/loki:3.7.2@sha256:191d4fdfb7264f16989f0a57f320872620a5a7c2ceeec6229212c4190ec49b86
+    image: grafana/loki:3.7.4@sha256:87f0a067673756a3cede1bcbf0c74875f7df9b09fddb53e399d0c576f756cfcc
     container_name: loki
     restart: unless-stopped
     runtime: runc
