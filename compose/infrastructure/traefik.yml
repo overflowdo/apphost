@@ -8,7 +8,7 @@ services:
   # Init-Container: rendert traefik.yml aus dem Template (Platzhalter aus .env)
   # bei jedem Start und beendet sich.
   traefik-init:
-    image: traefik:v3.7.1@sha256:6b9cbca6fac42ab0075f5437d8dc1685cfd188626d8d515839ea94f8b6271c42
+    image: traefik:v3.7.9@sha256:652929a140a32d7cafafb13c6cdfab5376cfeff800f51397b87b524501ed02a8
     container_name: traefik-init
     restart: "no"
     runtime: runc
@@ -72,7 +72,7 @@ services:
     labels:
       - "traefik.enable=false"
   traefik:
-    image: traefik:v3.7.1@sha256:6b9cbca6fac42ab0075f5437d8dc1685cfd188626d8d515839ea94f8b6271c42
+    image: traefik:v3.7.9@sha256:652929a140a32d7cafafb13c6cdfab5376cfeff800f51397b87b524501ed02a8
     container_name: traefik
     restart: unless-stopped
     runtime: runc
