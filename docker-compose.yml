@@ -26,6 +26,13 @@ networks:
   documents-network:
     name: documents-network
     driver: bridge
+  # Dienste, die dem Remote-User-Header von Authelia vertrauen, gehoeren NICHT
+  # in das flache traefik-public: dort haengen ~20 Container, und jeder koennte
+  # den Header direkt am Dienst vorbei an Traefik setzen. In diesem Netz stecken
+  # nur Traefik und der jeweilige Dienst.
+  sso-header-network:
+    name: sso-header-network
+    driver: bridge
 
 include:
   # Infrastructure

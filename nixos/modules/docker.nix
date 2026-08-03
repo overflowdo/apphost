@@ -16,7 +16,18 @@ in
     autoPrune  = {
       enable   = true;
       dates    = "weekly";
-      flags    = [ "--all" "--volumes" "--filter" "until=720h" ];
+      # KEIN "--volumes" und kein "--all":
+      #  - Docker lehnt "--volumes" zusammen mit "--filter until=..." ab
+      #    ("The 'until' filter is not supported with '--volumes'"). Der Dienst
+      #    brach damit bei JEDEM Lauf sofort ab und hat nie etwas aufgeräumt –
+      #    aufgefallen wäre das erst über HostDiskSpaceLow.
+      #  - "--volumes" ist hier ohnehin gefährlich: bei gestopptem Stack gelten
+      #    alle Volumes als unbenutzt, das Kommando würde Immich-, Paperless-
+      #    und Vaultwarden-Daten löschen.
+      #  - "--all" würde auch Images entfernen, die nur gerade nicht laufen.
+      # Übrig bleibt das Sichere: gestoppte Container, ungenutzte Netzwerke,
+      # dangling Images und Build-Cache älter als 30 Tage.
+      flags    = [ "--filter" "until=720h" ];
     };
 
     # Docker-Daemon Optionen
@@ -90,6 +101,11 @@ in
     subGidRanges = [{ startGid = userns.remapBase; count = userns.remapCount; }];
   };
   users.groups.dockremap = {};
+
+  # Auch der Prune-Dienst meldet sich, wenn er scheitert (Template-Unit in
+  # modules/backup.nix). Vorher wäre ein Dauerfehler nur über den vollen
+  # Datenträger aufgefallen.
+  systemd.services.docker-prune.onFailure = [ "apphost-notify-failure@%n.service" ];
 
   systemd.services.docker = {
     serviceConfig = {

@@ -65,6 +65,15 @@ services:
     devices:
       - /dev/kmsg
     security_opt: ['no-new-privileges:true']
+    # cap_drop fehlte hier als einzigem Container neben alloy. Zusammen mit
+    # userns_mode: "host" lief cAdvisor als echter Host-Root mit dem vollen
+    # Docker-Default-Capability-Satz – bei gemountetem /:/rootfs:ro und
+    # /var/lib/docker:ro ist das der Unterschied zwischen "liest Metriken" und
+    # "liest /etc/shadow, .env und jedes Container-Volume".
+    # DAC_READ_SEARCH bleibt, damit das Traversieren von /var/lib/docker (0710)
+    # und /dev/kmsg weiter klappt; DAC_OVERRIDE (Schreibrechte) braucht es nicht.
+    cap_drop: [ALL]
+    cap_add: [DAC_READ_SEARCH]
     deploy:
       resources:
         limits: {cpus: "0.5", memory: 256M}
@@ -135,6 +144,12 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     security_opt: ['no-new-privileges:true']
+    # Wie cAdvisor: lief mit userns_mode: "host" als Host-Root mit vollem
+    # Default-Capability-Satz. DAC_READ_SEARCH bleibt fürs Lesen von
+    # /var/log/journal (0640 root:systemd-journal) und
+    # /var/lib/docker/containers (0710).
+    cap_drop: [ALL]
+    cap_add: [DAC_READ_SEARCH]
     deploy:
       resources:
         limits: {cpus: "0.5", memory: 128M}

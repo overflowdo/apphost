@@ -19,7 +19,10 @@
 #                -> Owner apphost, world-readable
 set -euo pipefail
 
-MEDIA_ROOT="${MEDIA_DIR:-/mnt/media}"
+# Fest /mnt/media: der Pfad steht in den Compose-Dateien und in
+# nixos/modules/media-disk.nix ohnehin fest, MEDIA_DIR wirkte nur hier und in
+# Jellyfin und war damit eine Falle (siehe .env.example).
+MEDIA_ROOT="/mnt/media"
 
 if [[ $EUID -ne 0 ]]; then
     echo "Bitte mit sudo ausführen." >&2

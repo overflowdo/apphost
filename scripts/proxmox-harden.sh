@@ -106,7 +106,9 @@ for mod in usbhid uas; do
 done
 
 # usb-storage sicherstellen (explizites Laden umgeht eine evtl. noch aktive Blacklist).
-modprobe usb-storage 2>/dev/null && echo "usb-storage geladen." || true
+if modprobe usb-storage 2>/dev/null; then
+    echo "usb-storage geladen."
+fi
 
 echo "USB gehaertet (uas/usbhid blockiert), Bulk-Datenplatte ueber usb-storage erlaubt."
 

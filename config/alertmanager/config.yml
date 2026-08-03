@@ -1,7 +1,5 @@
 global:
   resolve_timeout: 5m
-templates:
-  - "/etc/alertmanager/templates/*.tmpl"
 route:
   # Standard-Receiver
   receiver: "ntfy-critical"
@@ -28,6 +26,13 @@ route:
     - match:
         alertname: Watchdog
       receiver: "null"
+# HINWEIS zur Darstellung: "?template=alertmanager" nutzt das in ntfy ab 2.9
+# eingebaute Alertmanager-Template. Ohne das postet Alertmanager seine komplette
+# Alert-Gruppe als JSON, und ntfy veröffentlicht diesen String unverändert –
+# auf dem Handy kam also ein roher JSON-Blob an. Das früher hier stehende
+# "templates: /etc/alertmanager/templates/*.tmpl" half nicht: das Verzeichnis
+# existiert nicht, und webhook_configs nutzen Alertmanager-Templates ohnehin nicht.
+#
 # HINWEIS zur Authentifizierung gegen ntfy:
 # Hier stand vorher 'bearer_token: "${NTFY_ADMIN_TOKEN}"'. Das konnte nie
 # funktionieren: Alertmanager expandiert KEINE Umgebungsvariablen in seiner
@@ -46,7 +51,7 @@ receivers:
   # Kritische Alerts (hohe Priorität)
   - name: ntfy-critical
     webhook_configs:
-      - url: "http://ntfy:80/apphost-critical"
+      - url: "http://ntfy:80/apphost-critical?template=alertmanager"
         send_resolved: true
         http_config:
           basic_auth:
@@ -55,7 +60,7 @@ receivers:
   # Warnungen (normale Priorität)
   - name: ntfy-warning
     webhook_configs:
-      - url: "http://ntfy:80/apphost-warnings"
+      - url: "http://ntfy:80/apphost-warnings?template=alertmanager"
         send_resolved: true
         http_config:
           basic_auth:

@@ -1,0 +1,131 @@
+# Statische Prüfungen für jeden Push und Pull Request.
+#
+# Fängt genau die Klasse von Fehlern, die in diesem Repo mehrfach durchgerutscht
+# ist: eine Compose-Datei, die sich nicht mehr rendern lässt, ein Shell-Skript
+# mit einem Tippfehler im Pfad, eine YAML-Datei mit einem überzähligen
+# Anführungszeichen, eine Nix-Datei, die nicht evaluiert.
+name: CI
+
+on:
+  # Nur main im Push-Trigger: sonst laufen für jeden Branch mit offenem PR alle
+  # Jobs doppelt (einmal push, einmal pull_request) – das war der Grund für
+  # "6 failing, 2 successful checks" bei nur vier Jobs.
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Platzhalter-.env und Secret-Dateien anlegen
+        # Die echten Werte stehen nie im Repo; für "config" genügen Attrappen.
+        # Fehlen die per Bind-Mount eingehängten Secret-Dateien, bricht compose
+        # mit "env file not found" ab.
+        run: |
+          set -euo pipefail
+          sed -e 's/^\(PAPERLESS_REDIS_PASSWORD\)=.*/\1=ci/' .env.example > .env
+          {
+            echo "CF_DNS_API_TOKEN=ci"
+            echo "IMMICH_DB_PASSWORD=ci"
+            echo "IMMICH_JWT_SECRET=ci"
+            echo "PAPERLESS_SECRET_KEY=ci"
+            echo "PAPERLESS_REDIS_PASSWORD=ci"
+            echo "OPENCLOUD_ADMIN_PASSWORD=ci"
+            echo "COLLABORA_ADMIN_PASSWORD=ci"
+            echo "GRAFANA_ADMIN_PASSWORD=ci"
+            echo "GRAFANA_SECRET_KEY=ci"
+            echo "VAULTWARDEN_ADMIN_TOKEN=ci"
+          } >> .env
+          mkdir -p secrets
+          touch secrets/authelia.env secrets/authelia_oidc_jwks.pem \
+                secrets/authelia_users.yml secrets/ntfy.env \
+                secrets/alertmanager_ntfy_password secrets/radicale_users \
+                secrets/oidc-grafana.env secrets/oidc-paperless.env
+      - name: Compose-Konfiguration rendern
+        run: docker compose config --quiet
+      - name: Auf zurückgelassene :latest-Images prüfen
+        run: |
+          if grep -rn --include='*.yml' -E '^\s*image:.*:latest' compose/ ; then
+            echo "::error::Image ohne feste Version gefunden (siehe oben)."
+            exit 1
+          fi
+
+  shell:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    # Die Skripte enthalten Umlaute und Rahmenzeichen; ohne UTF-8-Locale bricht
+    # shellcheck beim Schreiben der Ausgabe ab ("commitBuffer: invalid argument").
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Syntax
+        run: |
+          set -euo pipefail
+          for f in scripts/*.sh nixos/install.sh; do bash -n "$f"; done
+          sh -n config/traefik/render.sh
+      - name: shellcheck
+        # SC1091: eingebundene Dateien (.env) existieren im Checkout nicht.
+        run: shellcheck -e SC1091 scripts/*.sh nixos/install.sh config/traefik/render.sh
+
+  yaml:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install yamllint
+      - name: yamllint
+        # config/authelia/configuration.yml ist ein Go-Template, kein reines YAML.
+        run: |
+          yamllint -d '{extends: relaxed, rules: {line-length: disable, comments: disable, comments-indentation: disable}}' \
+            $(git ls-files '*.yml' '*.yaml' | grep -v 'config/authelia/configuration.yml')
+
+  nix:
+    name: nix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: "experimental-features = nix-command flakes"
+      - name: Maschinenspezifische Platzhalter erzeugen
+        # Diese drei Dateien erzeugt nixos/install.sh pro Installation und sind
+        # gitignored. hardware-configuration.nix MUSS dabei leer bleiben:
+        # fileSystems kommt aus nixos/disko.nix und die Plattform aus
+        # nixosSystem { system = ...; } – ein Platzhalter, der beides selbst
+        # setzt, kollidiert damit und war der Grund, warum dieser Job rot war.
+        run: |
+          set -euo pipefail
+          cat > nixos/hardware-configuration.nix <<'NIXEOF'
+          { modulesPath, ... }:
+          { imports = [ (modulesPath + "/installer/scan/not-detected.nix") ]; }
+          NIXEOF
+          echo '[ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICIexampleexampleexampleexampleexampleexampl ci@example" ]' > nixos/ssh-key.nix
+          echo 'false' > nixos/disk-encryption.nix
+      - name: Syntax aller Nix-Dateien
+        # Harte Schranke: parst jede .nix-Datei, ohne nixpkgs zu laden. Fängt
+        # fehlende Klammern, kaputte ''-Strings und Syntaxfehler.
+        run: |
+          set -euo pipefail
+          for f in $(git ls-files '*.nix'); do
+            nix-instantiate --parse "$f" > /dev/null
+          done
+          echo "Alle $(git ls-files '*.nix' | wc -l) Nix-Dateien parsen sauber."
+      - name: Konfiguration evaluieren (informativ)
+        # Weiche Schranke: wertet die komplette NixOS-Konfiguration aus und
+        # findet damit auch falsche Options-Namen und Typfehler. Bewusst mit
+        # continue-on-error, weil das Ergebnis von den Flake-Inputs (nixpkgs,
+        # disko, lanzaboote) und deren Versionssprüngen abhängt – ein aus
+        # diesem Grund dauerrot stehender Pflicht-Job führt nur dazu, dass die
+        # CI insgesamt ignoriert wird. Steht der Schritt dauerhaft grün, kann
+        # continue-on-error entfallen.
+        continue-on-error: true
+        run: nix flake check --no-build

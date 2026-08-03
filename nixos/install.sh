@@ -180,7 +180,11 @@ echo "NixOS erfolgreich installiert! :party:"
 # sbctl nutzt seinen internen State-Dir (/usr/share/secureboot oder Config).
 # Wir schreiben dahereine sbctl-Config, die auf /etc/secureboot zeigt, bevor wir create-keys rufen.
 echo "Generiere Secure Boot Schlüssel..."
-nixos-enter --root /mnt -- bash -c '
+# Das folgende Skript läuft IM Zielsystem (nixos-enter). Die einfachen
+# Anführungszeichen sind Absicht: $TARGET und $SBCTL_CFG sollen dort expandiert
+# werden, nicht hier.
+# shellcheck disable=SC2016
+if nixos-enter --root /mnt -- bash -c '
   set -euo pipefail
   TARGET=/etc/secureboot/keys
   mkdir -p "$TARGET" /etc/sbctl
@@ -203,8 +207,11 @@ nixos-enter --root /mnt -- bash -c '
 
   [ -f "$TARGET/db/db.pem" ] || { echo "FEHLER: Secure Boot Keys nicht gefunden! Das sollte nicht passieren."; exit 1; }
   echo "Keys erfolgreich unter $TARGET"
-' && info "Secure Boot Schlüssel erzeugt: /etc/secureboot" \
-  || warn "sbctl fehlgeschlagen – nach dem Neustart manuell: sudo sbctl create-keys && sudo nixos-rebuild boot"
+' ; then
+  info "Secure Boot Schlüssel erzeugt: /etc/secureboot"
+else
+  warn "sbctl fehlgeschlagen – nach dem Neustart manuell: sudo sbctl create-keys && sudo nixos-rebuild boot"
+fi
 
 # ---- Bootloader installieren ----
 info "Installiere Bootloader (lanzaboote signiert EFI-Binaries)..."
@@ -226,15 +233,14 @@ MONOREPO_REMOTE=""
 
 if [[ -n "$MONOREPO_REMOTE" ]]; then
   MONOREPO_BRANCH="$(git -C "$MONOREPO_ROOT" rev-parse --abbrev-ref HEAD)"
-  APPHOST_SUBDIR="$(realpath --relative-to="$MONOREPO_ROOT" "$REPO_DIR")"
   CHECKOUT_DIR="/mnt/opt/monorepo"
 
   info "Richte aktualisierbares Git-Repo unter /opt/monorepo ein..."
   mkdir -p /mnt/opt
   # Standalone-Repo: komplettes Repo auschecken. (Der frühere Sparse-Checkout
   # stammte aus der Monorepo-Zeit, in der nur das Unterverzeichnis apphost/
-  # ausgecheckt wurde; bei APPHOST_SUBDIR="." würde er die Unterordner
-  # nixos/, compose/, config/ nicht mit auschecken.)
+  # ausgecheckt wurde; bei einem Unterverzeichnis "." hätte er die Ordner
+  # nixos/, compose/, config/ nicht mit ausgecheckt.)
   git clone --branch "$MONOREPO_BRANCH" "$MONOREPO_ROOT" "$CHECKOUT_DIR"
   git -C "$CHECKOUT_DIR" remote set-url origin "$MONOREPO_REMOTE"
 

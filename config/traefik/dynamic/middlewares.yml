@@ -32,22 +32,47 @@ http:
         customRequestHeaders:
           X-Forwarded-Proto: "https"
           X-Real-IP: ""
+    # HINWEIS: csp-self war definiert, aber von keinem einzigen Router
+    # referenziert – toter Code, der Schutz suggerierte. Die Richtlinie ist
+    # bewusst NICHT global in default-chain aufgenommen: 'self' bricht bei
+    # mehreren Diensten (Immich, OpenCloud, Grafana laden Ressourcen von
+    # eigenen Sub-Origins bzw. per blob:/data:). Wer sie einsetzen will, hängt
+    # sie gezielt an EINEN Router und prüft die Browser-Konsole:
+    #   traefik.http.routers.<name>.middlewares=csp-self@file,default-chain@file
     csp-self:
       headers:
         contentSecurityPolicy: >-
           default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' wss: https:; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;
+    # Rate-Limiting. Es gab bislang KEINE einzige rateLimit- oder
+    # inFlightReq-Middleware im Stack. Zusammen mit dem fail2ban-Jail, dessen
+    # Bans nicht griffen, war jeder Login-Endpunkt völlig ungebremst –
+    # betroffen vor allem Radicale (Basic-Auth ohne eigenen Brute-Force-Schutz),
+    # Vaultwarden und Jellyfin.
+    # average/burst gelten pro Client-IP (sourceCriterion default = request host).
+    # 50/s im Mittel mit Burst 100 stört normales Browsen nicht (eine Seite
+    # lädt schnell 30+ Assets), bremst automatisierte Versuche aber deutlich.
+    rate-limit:
+      rateLimit:
+        average: 50
+        burst: 100
+        period: 1s
+    # Strenger für Anmelde-Endpunkte: Authelia-Portal, Radicale, Vaultwarden.
+    rate-limit-auth:
+      rateLimit:
+        average: 5
+        burst: 15
+        period: 1s
+    # Begrenzt gleichzeitige Verbindungen pro Client – gegen Slowloris-artige
+    # Muster und versehentliche Client-Schleifen.
+    in-flight:
+      inFlightReq:
+        amount: 60
     # Compress – GZIP/Brotli für alle Responses
     compress:
       compress:
         excludedContentTypes:
           - "text/event-stream" # Server-Sent Events nicht komprimieren
         minResponseBodyBytes: 1024
-    # Redirect www -> non-www
-    redirect-www:
-      redirectRegex:
-        regex: "^https://www\\.(.*)"
-        replacement: "https://${1}"
-        permanent: true
     # ForwardAuth mit Authelia
     # Schützt Services ohne eigenes OIDC
     forward-auth:
@@ -73,7 +98,7 @@ http:
           Remote-Email: ""
     # OpenCloud bettet Collabora als Cross-Origin-Iframe (office.<domain>) ein.
     # Mit COEP: require-corp müsste dieser Frame (und alle seine Ressourcen)
-    # einen CORP-Header liefern. Dadurch können externe Ressourcen oft nicht richtig geladen werden, die hier benötigt werden. 
+    # einen CORP-Header liefern. Dadurch können externe Ressourcen oft nicht richtig geladen werden, die hier benötigt werden.
     opencloud-headers:
       headers:
         stsSeconds: 63072000
@@ -101,12 +126,16 @@ http:
     default-chain:
       chain:
         middlewares:
+          - rate-limit
+          - in-flight
           - security-headers
           - compress
     # OpenCloud-Kette – wie default-chain, aber ohne COEP (siehe opencloud-headers)
     opencloud-chain:
       chain:
         middlewares:
+          - rate-limit
+          - in-flight
           - opencloud-headers
           - compress
     # Authelia-Kette – ForwardAuth für Services ohne eigenes OIDC.
@@ -118,7 +147,17 @@ http:
     authelia-chain:
       chain:
         middlewares:
+          - rate-limit
+          - in-flight
           - strip-remote-user
           - forward-auth
+          - security-headers
+          - compress
+    # Für Endpunkte, an denen tatsächlich Zugangsdaten geprüft werden.
+    auth-endpoint-chain:
+      chain:
+        middlewares:
+          - rate-limit-auth
+          - in-flight
           - security-headers
           - compress

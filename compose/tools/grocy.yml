@@ -13,8 +13,17 @@ services:
     container_name: grocy
     restart: unless-stopped
     runtime: runc
+    # NICHT in traefik-public: Grocy vertraut dem Remote-User-Header ohne
+    # IP-Whitelist (config/grocy/config.php -> ReverseProxyAuthMiddleware). In
+    # einem Netz mit ~20 weiteren Containern ist
+    #   curl -H 'Remote-User: admin' http://grocy/
+    # aus jedem davon ein vollwertiger Admin-Login – an Traefik, an
+    # strip-remote-user und an Authelia vorbei. Genau das Risiko, das bei
+    # Paperless durch PAPERLESS_ENABLE_HTTP_REMOTE_USER: "false" geschlossen
+    # wurde; bei Grocy geht das nicht, weil der Header dort DIE Anmeldung ist.
+    # Deshalb ein eigenes Netz, in dem nur Traefik und Grocy stehen.
     networks:
-      traefik-public: {}
+      sso-header-network: {}
     volumes:
       - grocy_config:/config
       # Feature-Flags declarativ: blendet nicht benötigte Module aus (Rezepte,
@@ -45,6 +54,10 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.grocy.rule=Host(`${GROCY_SUBDOMAIN:-grocy}.${DOMAIN}`)"
       - "traefik.http.routers.grocy.entrypoints=websecure"
+      # Pflicht, seit Grocy nicht mehr in traefik-public hängt: der
+      # Docker-Provider nimmt sonst das global gesetzte Default-Netz
+      # (providers.docker.network) und findet dort keine IP für den Container.
+      - "traefik.docker.network=sso-header-network"
       - "traefik.http.services.grocy.loadbalancer.server.port=80"
       - "traefik.http.routers.grocy.middlewares=authelia-chain@file"
       - "homepage.group=Tools"

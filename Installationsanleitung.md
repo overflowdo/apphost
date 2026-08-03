@@ -158,6 +158,34 @@ Das Skript gibt am Ende eine Zusammenfassung mit allen Warnungen aus. Anschließ
 
 Standardeinstellungen beibehalten. Auf **Finish** klicken.
 
+### Datenplatte für Fotos, Dokumente und Dateien
+
+Der Stack erwartet **zusätzlich zur Systemplatte** einen zweiten Datenträger, der nach `/mnt/media` gemountet wird. Dort liegen die eigentlichen Nutzdaten: Immich-Fotos, Paperless-Dokumente, OpenCloud-Dateien und die Radicale-Kalender. `nixos/modules/media-disk.nix` mountet ihn fest über
+
+```
+/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1
+```
+
+Die Platte muss der VM deshalb **als `scsi1`** durchgereicht werden – entweder als weiterer virtueller Datenträger oder als durchgereichte physische Platte:
+
+```bash
+# Beispiel: physische USB-/SATA-Platte an die VM 100 durchreichen
+qm set 100 -scsi1 /dev/disk/by-id/<deine-platte>
+```
+
+Prüfen lässt sich der Name nach dem ersten Boot in der VM mit `ls -l /dev/disk/by-id/`. Weicht er ab, den Pfad in `nixos/modules/media-disk.nix` anpassen und `rebuild` ausführen.
+
+> [!WARNING]
+> Der Mount ist mit `nofail` konfiguriert, damit ein fehlender Datenträger den Host nicht am Booten hindert. Die Kehrseite: **fehlt die Platte, fällt es nicht sofort auf.** `apphost-media-dirs` überspringt sich dann stillschweigend, Docker legt `/mnt/media/*` als root-eigene Verzeichnisse auf der Systemplatte an, und Immich, OpenCloud und Radicale laufen in die „nobody"-Falle (Container starten in einer Crash-Schleife, weil ihnen die Ordner nicht gehören).
+>
+> Dafür gibt es jetzt den Alert `MediaDiskMissing`. Manuell prüfen:
+>
+> ```bash
+> mountpoint /mnt/media && df -h /mnt/media
+> ```
+>
+> Wurden bereits falsche Verzeichnisse angelegt: Stack stoppen (`down`), `sudo rm -rf /mnt/media/*` **auf der Systemplatte**, Platte einhängen, `sudo systemctl start apphost-media-dirs`, dann `up`.
+
 ---
 
 ## 5. Initiale NixOS-Konfiguration

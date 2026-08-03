@@ -61,7 +61,7 @@ services:
       - "traefik.http.routers.authelia.rule=Host(`${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}`)"
       - "traefik.http.routers.authelia.entrypoints=websecure"
       - "traefik.http.services.authelia.loadbalancer.server.port=9091"
-      - "traefik.http.routers.authelia.middlewares=security-headers@file,compress@file"
+      - "traefik.http.routers.authelia.middlewares=rate-limit@file,in-flight@file,security-headers@file,compress@file"
       - "homepage.group=Infrastruktur"
       - "homepage.name=Authelia"
       - "homepage.icon=authelia.png"

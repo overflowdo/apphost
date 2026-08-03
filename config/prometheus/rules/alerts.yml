@@ -20,6 +20,34 @@ groups:
         annotations:
           summary: "Wenig RAM verfügbar ({{ $labels.instance }})"
           description: "Nur {{ printf \"%.2f\" $value }}% RAM verfügbar"
+      # /mnt/media hatte gar keinen Alert – dort liegen Immich-Fotos,
+      # Paperless-Dokumente, OpenCloud-Dateien und Radicale-Kalender. Läuft die
+      # Platte voll, fällt das sonst erst durch scheiternde Uploads auf.
+      - alert: MediaDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/mnt/media"} / node_filesystem_size_bytes{mountpoint="/mnt/media"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Wenig Platz auf der Datenplatte /mnt/media"
+          description: "{{ printf \"%.2f\" $value }}% frei – betrifft Immich, Paperless, OpenCloud und Radicale."
+      - alert: MediaDiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/mnt/media"} / node_filesystem_size_bytes{mountpoint="/mnt/media"}) * 100 < 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "KRITISCH: Datenplatte /mnt/media fast voll"
+      # Die Bulk-Platte ist per nofail gemountet – fällt sie ganz weg, gibt es
+      # die Serien oben nicht mehr und absent() schlägt an.
+      - alert: MediaDiskMissing
+        expr: absent(node_filesystem_size_bytes{mountpoint="/mnt/media"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "/mnt/media ist nicht gemountet"
+          description: "nofail lässt den Host trotzdem booten; Container schreiben dann auf die Systemplatte."
       - alert: HostDiskSpaceLow
         expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
         for: 5m
@@ -60,14 +88,38 @@ groups:
     rules:
       # Setzt voraus, dass cAdvisor seine Docker-Factory registrieren konnte
       # (socket-proxy braucht dafür INFO=1) – sonst fehlt das name-Label an
-      # allen container_*-Metriken und absent() feuert dauerhaft.
-      - alert: ContainerDown
+      # allen container_*-Metriken.
+      #
+      # Diese Regel erkennt NUR den Totalausfall (cAdvisor meldet gar keine
+      # Container mehr), nicht den Ausfall eines einzelnen Dienstes – dafür
+      # ist ContainerVanished darunter zuständig. Umbenannt, weil der alte Name
+      # "ContainerDown" bei einem absent() über alle Container das Gegenteil
+      # dessen versprach, was er tut.
+      - alert: NoContainerMetrics
         expr: absent(container_last_seen{name!=""})
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Container nicht gefunden: {{ $labels.name }}"
+          summary: "cAdvisor meldet keinerlei Container mehr"
+          description: "Entweder ist cAdvisor selbst weg oder seine Docker-Integration (socket-proxy INFO=1)."
+      # Ausfall eines EINZELNEN Containers. container_last_seen trägt den
+      # Zeitstempel der letzten Beobachtung; bleibt der stehen, läuft der
+      # Container nicht mehr. Das Fenster ist begrenzt: nach ~5 Minuten ohne
+      # Aktualisierung verschwindet die Serie (Staleness) und der Alert löst
+      # sich von selbst auf – 2 Minuten "for" liegen sicher darin.
+      # Für Dienste, die Prometheus ohnehin scrapt, greift zusätzlich
+      # TargetDown; die beiden ergänzen sich.
+      - alert: ContainerVanished
+        expr: (time() - container_last_seen{name!=""}) > 120
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container antwortet nicht mehr: {{ $labels.name }}"
+          description: "Letzte Beobachtung durch cAdvisor vor {{ printf \"%.0f\" $value }}s."
+      # Ein Container, der dauerhaft neu startet, verschwindet nie lange genug
+      # für die Regel oben. ContainerRestarting unten deckt diesen Fall ab.
       - alert: ContainerHighMemory
         expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
         for: 5m
