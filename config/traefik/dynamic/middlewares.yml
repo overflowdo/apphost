@@ -48,7 +48,8 @@ http:
     # Bans nicht griffen, war jeder Login-Endpunkt völlig ungebremst –
     # betroffen vor allem Radicale (Basic-Auth ohne eigenen Brute-Force-Schutz),
     # Vaultwarden und Jellyfin.
-    # average/burst gelten pro Client-IP (sourceCriterion default = request host).
+    # average/burst gelten pro Client-IP: Traefiks Default für sourceCriterion
+    # ist die Remote-Adresse (ipStrategy), nicht der Request-Host.
     # 50/s im Mittel mit Burst 100 stört normales Browsen nicht (eine Seite
     # lädt schnell 30+ Assets), bremst automatisierte Versuche aber deutlich.
     rate-limit:
@@ -56,7 +57,10 @@ http:
         average: 50
         burst: 100
         period: 1s
-    # Strenger für Anmelde-Endpunkte: Authelia-Portal, Radicale, Vaultwarden.
+    # Strenger, für Endpunkte, an denen wirklich Zugangsdaten geprüft werden.
+    # Angewendet auf eigene Router mit PathPrefix (Authelia /api/firstfactor,
+    # Vaultwarden /identity/connect/token) – NICHT auf die kompletten Hosts:
+    # deren Oberflächen laden Dutzende Assets und würden sich selbst drosseln.
     rate-limit-auth:
       rateLimit:
         average: 5
@@ -67,6 +71,16 @@ http:
     in-flight:
       inFlightReq:
         amount: 60
+    # Radicale prüft Basic-Auth bei JEDEM Request, es gibt keinen separaten
+    # Login-Pfad – ein eigener Router wie bei Vaultwarden ist dort also nicht
+    # möglich. 50/s sind für Brute Force keine Bremse (real limitiert nur der
+    # bcrypt-Kostenfaktor die CPU), deshalb für cal.<domain> ein eigenes,
+    # deutlich strengeres Limit. DAVx5 synct in Intervallen und kommt damit aus.
+    rate-limit-dav:
+      rateLimit:
+        average: 8
+        burst: 25
+        period: 1s
     # Compress – GZIP/Brotli für alle Responses
     compress:
       compress:
@@ -158,6 +172,14 @@ http:
       chain:
         middlewares:
           - rate-limit-auth
+          - in-flight
+          - security-headers
+          - compress
+    # Kette für Radicale (CalDAV/CardDAV).
+    dav-chain:
+      chain:
+        middlewares:
+          - rate-limit-dav
           - in-flight
           - security-headers
           - compress

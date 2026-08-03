@@ -103,21 +103,31 @@ groups:
         annotations:
           summary: "cAdvisor meldet keinerlei Container mehr"
           description: "Entweder ist cAdvisor selbst weg oder seine Docker-Integration (socket-proxy INFO=1)."
-      # Ausfall eines EINZELNEN Containers. container_last_seen trägt den
-      # Zeitstempel der letzten Beobachtung; bleibt der stehen, läuft der
-      # Container nicht mehr. Das Fenster ist begrenzt: nach ~5 Minuten ohne
-      # Aktualisierung verschwindet die Serie (Staleness) und der Alert löst
-      # sich von selbst auf – 2 Minuten "for" liegen sicher darin.
-      # Für Dienste, die Prometheus ohnehin scrapt, greift zusätzlich
-      # TargetDown; die beiden ergänzen sich.
+      # Ausfall eines EINZELNEN Containers.
+      #
+      # NICHT "time() - container_last_seen > 120": Prometheus markiert eine
+      # Serie als stale, sobald sie aus einem Scrape verschwindet – nicht erst
+      # nach fünf Minuten. Stirbt ein Container, nimmt cAdvisor ihn aus
+      # /metrics, und beim nächsten Scrape gibt es container_last_seen fuer
+      # ihn gar nicht mehr. Die Differenz wird also nie 120, der Ausdruck
+      # liefert einen leeren Vektor und der Alert feuert nie – dieselbe
+      # Fehlerklasse wie beim ursprünglichen absent().
+      #
+      # Diese Form vergleicht stattdessen "war vor 10 Minuten da" mit "ist
+      # jetzt da" und braucht dafür keine hartkodierte Container-Liste.
+      # Bekannter Nebeneffekt: ein bewusst entfernter Container meldet sich
+      # einmalig für 10 Minuten.
       - alert: ContainerVanished
-        expr: (time() - container_last_seen{name!=""}) > 120
+        expr: |
+          count by (name) (container_last_seen{name!=""} offset 10m)
+            unless
+          count by (name) (container_last_seen{name!=""})
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "Container antwortet nicht mehr: {{ $labels.name }}"
-          description: "Letzte Beobachtung durch cAdvisor vor {{ printf \"%.0f\" $value }}s."
+          summary: "Container läuft nicht mehr: {{ $labels.name }}"
+          description: "War vor 10 Minuten noch da, wird von cAdvisor jetzt nicht mehr gemeldet."
       # Ein Container, der dauerhaft neu startet, verschwindet nie lange genug
       # für die Regel oben. ContainerRestarting unten deckt diesen Fall ab.
       - alert: ContainerHighMemory

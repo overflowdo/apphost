@@ -142,7 +142,24 @@
           findtime = "10m";
           bantime  = "1h";
           filter   = "traefik-auth";
-          action   = ''nftables-multiport[name=traefik-auth, port="80,443", protocol=tcp, chain=f2b-forward, chain_hook=forward, chain_priority=-150]'';
+          # ALLPORTS, nicht multiport: die multiport-Variante erzeugt
+          # "tcp dport { 80,443 }". Im forward-Hook stimmt das nicht mehr –
+          # Docker hat in prerouting längst auf 172.23.1.2:8081/:8443 gedreht
+          # (Port-Mapping in compose/infrastructure/traefik.yml). Die Ban-Regel
+          # hätte also nie gematcht. port="8081,8443" wäre die Alternative,
+          # koppelt das Jail aber an das Compose-Port-Mapping. Ein Ban ist
+          # ohnehin IP-basiert, ein Port-Match bringt hier nichts.
+          # Gegenprobe: sudo nft list table inet f2b-table -> es darf KEIN
+          # "dport" in der Regel stehen.
+          action   = ''nftables-allports[name=traefik-auth, protocol=tcp, chain=f2b-forward, chain_hook=forward, chain_priority=-150]'';
+          # Ohne ignoreip sperrt sich der Admin selbst aus, sobald die Bans
+          # wirken: Container-interne Aufrufe (Homepage-Widgets, Healthchecks)
+          # kommen aus 172.16.0.0/12 und dürfen nie zu einem Ban führen.
+          # Das LAN steht BEWUSST NICHT hier: der Stack ist nur aus dem LAN
+          # erreichbar (DNS-01, keine Portfreigabe) – wer 192.168.178.0/24
+          # ignoriert, schaltet das Jail komplett ab. Die eigene Workstation
+          # kann man bei Bedarf einzeln ergänzen.
+          ignoreip = "127.0.0.1/8 ::1 172.16.0.0/12";
         };
       };
     };
@@ -151,21 +168,34 @@
   };
 
   # Fail2ban Filter für Traefik.
-  # Traefik schreibt das Access-Log als JSON (format: json) – die alte failregex
-  # erwartete Common Log Format und hätte nie gematcht. Deshalb hier direkt auf
-  # die JSON-Felder: "ClientHost":"<IP>" ... "DownstreamStatus":401.
-  # Die Reihenfolge der Felder ist bei Traefik stabil (ClientHost vor Status);
-  # zur Sicherheit erlaubt .* beliebige Felder dazwischen.
   #
-  # Zweite Zeile für Vaultwarden: das antwortet auf einen falschen Login NICHT
-  # mit 401, sondern mit 400 (invalid_grant, so will es OAuth2). Ein pauschales
-  # 400 wäre viel zu breit – jede fehlerhafte Anfrage im Stack würde zählen –,
-  # deshalb eingegrenzt auf den Token-Endpunkt. RequestPath ist das Feld, unter
-  # dem Traefik den Pfad ablegt.
+  # ZWEI Dinge sind hier entscheidend:
+  #
+  # 1. Feldreihenfolge. Traefik schreibt das Access-Log mit logrus.JSONFormatter,
+  #    der die Felder als Go-Map serialisiert – encoding/json sortiert Map-Keys
+  #    ALPHABETISCH. In der Zeile steht also immer:
+  #      ClientHost ... DownstreamStatus ... RequestHost ... RequestPath ... ServiceName
+  #    Eine failregex, die RequestPath VOR DownstreamStatus erwartet, matcht nie.
+  #    (Genau der Fehler steckte in der zuvor ergänzten Vaultwarden-Zeile.)
+  #
+  # 2. Eingrenzung auf echte Anmeldeversuche. Ein pauschales "jede 401" ist ein
+  #    Selbstschuss: Authelias Session läuft nach 15 Minuten Inaktivität ab,
+  #    und ein offener Homepage-Tab pollt weiter. forward-auth antwortet auf
+  #    diese XHR mit 401 (die 302 gibt es nur für Accept: text/html) – fünf
+  #    davon in Sekunden, und maxretry=5 hätte den eigenen Rechner für eine
+  #    Stunde ausgesperrt, mit bantime-increment eskalierend bis 48 Stunden.
+  #    Gezählt werden deshalb nur Stellen, an denen wirklich Zugangsdaten
+  #    geprüft werden:
+  #      - Authelia: /api/firstfactor und /api/secondfactor/* -> 401
+  #      - Vaultwarden: /identity/connect/token -> 400 (invalid_grant, OAuth2)
+  #      - Radicale: Basic-Auth bei JEDEM Request, es gibt keinen Login-Pfad ->
+  #        deshalb über ServiceName statt über den Pfad. Das ist zugleich
+  #        unabhängig von RADICALE_SUBDOMAIN.
   environment.etc."fail2ban/filter.d/traefik-auth.conf".text = ''
     [Definition]
-    failregex = ^.*"ClientHost":"<HOST>".*"DownstreamStatus":(401|403).*$
-                ^.*"ClientHost":"<HOST>".*"RequestPath":"/identity/connect/token".*"DownstreamStatus":400.*$
+    failregex = ^.*"ClientHost":"<HOST>".*"DownstreamStatus":401.*"RequestPath":"/api/(first|second)factor.*$
+                ^.*"ClientHost":"<HOST>".*"DownstreamStatus":400.*"RequestPath":"/identity/connect/token".*$
+                ^.*"ClientHost":"<HOST>".*"DownstreamStatus":401.*"ServiceName":"radicale@docker".*$
     ignoreregex =
     datepattern = "StartUTC":"%%Y-%%m-%%dT%%H:%%M:%%S
   '';
@@ -241,13 +271,19 @@
       set -u
       mkdir -p /var/lib/aide
 
-      GEN="$(readlink -f /run/current-system)"
+      # Die Kennung umfasst die System-Generation UND den Stand von
+      # /opt/monorepo. Grund: AIDE überwacht auch compose/, scripts/ und
+      # nixos/ – der Alias `pull` ändert genau die, ohne die System-Generation
+      # zu berühren. Ohne den zweiten Teil käme nach jedem `pull` beim
+      # nächsten 02:30-Lauf eine Push-Meldung mit dem kompletten git-Diff.
+      REPO_REV="$(${pkgs.git}/bin/git -C /opt/monorepo rev-parse HEAD 2>/dev/null || echo none)"
+      GEN="$(readlink -f /run/current-system)+$REPO_REV"
       STAMP=/var/lib/aide/system-generation
 
       if [ ! -f /var/lib/aide/aide.db ]; then
         REASON="keine Datenbank vorhanden"
       elif [ "$(cat "$STAMP" 2>/dev/null || echo none)" != "$GEN" ]; then
-        REASON="System-Generation geändert (nixos-rebuild)"
+        REASON="System-Generation oder Repo-Stand geändert (nixos-rebuild / pull)"
       else
         REASON=""
       fi
