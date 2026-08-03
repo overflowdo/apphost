@@ -129,3 +129,46 @@ jobs:
         # continue-on-error entfallen.
         continue-on-error: true
         run: nix flake check --no-build
+
+  configs:
+    name: Dienst-Konfigurationen
+    runs-on: ubuntu-latest
+    # yamllint prüft nur Syntax. Genau in diesen vier Dateien steckten die
+    # Fehler der letzten Runden (Prometheus-Label, Alertmanager-Token,
+    # ntfy-Anführungszeichen, Alloy-Quellen) – die fängt erst das Werkzeug des
+    # jeweiligen Dienstes. Alle vier laufen als Einzeiler im passenden Image.
+    steps:
+      - uses: actions/checkout@v4
+      - name: promtool (Prometheus-Regeln und -Konfiguration)
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/config/prometheus:/etc/prometheus:ro" \
+            --entrypoint promtool prom/prometheus:v3.12.0 \
+            check rules /etc/prometheus/rules/alerts.yml
+          docker run --rm -v "$PWD/config/prometheus:/etc/prometheus:ro" \
+            --entrypoint promtool prom/prometheus:v3.12.0 \
+            check config /etc/prometheus/prometheus.yml
+      - name: amtool (Alertmanager)
+        run: |
+          set -euo pipefail
+          # basic_auth.password_file muss existieren, sonst bemängelt amtool
+          # die fehlende Datei statt der Konfiguration.
+          mkdir -p ci-secrets && echo dummy > ci-secrets/ntfy_password
+          docker run --rm \
+            -v "$PWD/config/alertmanager:/etc/alertmanager:ro" \
+            -v "$PWD/ci-secrets/ntfy_password:/run/secrets/ntfy_password:ro" \
+            --entrypoint amtool prom/alertmanager:v0.32.1 \
+            check-config /etc/alertmanager/config.yml
+      - name: alloy fmt (Syntaxprüfung)
+        # Bewusst OHNE --test: das schlägt auch bei reinen Formatierungs-
+        # unterschieden fehl (Einrückung, Ausrichtung der =). Uns interessiert
+        # hier nur, ob die Datei syntaktisch gültig ist – und genau daran
+        # scheitert `fmt` ebenfalls, nur ohne kosmetische Fehlalarme.
+        run: |
+          docker run --rm -v "$PWD/config/alloy:/etc/alloy:ro" \
+            grafana/alloy:v1.17.1 fmt /etc/alloy/config.alloy > /dev/null
+      # authelia validate-config fehlt hier bewusst: config/authelia/configuration.yml
+      # ist ein Go-Template ({{ env ... }}) und braucht zum Parsen
+      # X_AUTHELIA_CONFIG_FILTERS=template, rund acht Umgebungsvariablen UND die
+      # OIDC-Schlüsseldatei. Das in der CI nachzubauen erzeugt mehr Fehlerquellen,
+      # als es fängt.
