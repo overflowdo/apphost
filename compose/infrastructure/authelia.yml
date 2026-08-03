@@ -40,6 +40,8 @@ services:
       # "grocy.<domain>", während der Router ${GROCY_SUBDOMAIN} benutzt: bei
       # geändertem Subdomain-Namen griff default_policy: deny und Grocy war dicht.
       GROCY_SUBDOMAIN: ${GROCY_SUBDOMAIN:-grocy}
+      # Für die ACL-Regel auf Vaultwardens /admin (siehe configuration.yml).
+      VAULTWARDEN_SUBDOMAIN: ${VAULTWARDEN_SUBDOMAIN:-vault}
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
