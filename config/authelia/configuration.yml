@@ -59,8 +59,9 @@ access_control:
     # Infrastruktur bzw. kann sie umkonfigurieren.
     # WICHTIG beim ersten Login: Authelia verlangt die Registrierung eines
     # Geräts. Der Bestätigungslink geht an den filesystem-Notifier, nicht per
-    # Mail -> auslesen mit:
-    #   docker exec authelia cat /data/notification.txt
+    # Mail (kein SMTP konfiguriert). Der Alias `secrets` gibt ihn mit aus:
+    #   secrets        # bzw. bash scripts/show-secrets.sh
+    # Direkt geht auch: docker exec authelia cat /data/notification.txt
     - domain:
         - 'traefik.{{ env "DOMAIN" }}'
         - 'prometheus.{{ env "DOMAIN" }}'

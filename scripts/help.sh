@@ -22,7 +22,7 @@ cat <<'EOF'
     gc             Nix-Store aufräumen (Generationen > 30 Tage)
 
   Secrets & Zertifikate
-    secrets        Alle Passwörter/Tokens (aus .env + secrets/) anzeigen
+    secrets        Alle Passwörter/Tokens (.env + secrets/) + Authelia-2FA-Link
     regen-secrets  Secrets neu generieren (nach Passwortänderung in .env)
     ca             Lokales CA-Zertifikat ausgeben (Import in Browser/Handy)
     backup-db      Datenbank-Dumps nach /var/backups/apphost (täglich 02:30 automatisch)

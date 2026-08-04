@@ -47,6 +47,40 @@ echo "▶ Vaultwarden"
 line "/admin-Panel" "Token: $(file_val secrets/vaultwarden_admin_token.txt)"
 line "Nutzer-Login" "Registrierung AUS -> Konto in /admin einladen; Master-PW wählst du selbst"
 echo
+echo "▶ Authelia – Zweiter Faktor (TOTP/WebAuthn)"
+echo "  Pflicht für: traefik. / prometheus. / alertmanager.<domain> und vault.<domain>/admin"
+# Authelia verschickt den Registrierungslink NICHT per Mail, sondern über den
+# filesystem-Notifier in /data/notification.txt im Container (kein SMTP
+# konfiguriert). Ohne diesen Link steht man beim ersten Aufruf eines
+# 2FA-geschützten Dienstes vor einer Aufforderung, die sich nicht erfüllen
+# lässt – deshalb hier direkt mit ausgeben.
+if ! command -v docker >/dev/null 2>&1; then
+    line "Registrierungslink" "(docker nicht verfügbar)"
+elif ! running="$(docker ps --format '{{.Names}}' 2>/dev/null)"; then
+    # Eigener Zweig, damit ein nicht erreichbarer Daemon (bzw. fehlende
+    # Gruppenmitgliedschaft) nicht als "Container läuft nicht" erscheint.
+    line "Registrierungslink" "(Docker-Daemon nicht erreichbar – in der Gruppe 'docker'?)"
+elif ! printf '%s\n' "$running" | grep -qx authelia; then
+    line "Registrierungslink" "(Container 'authelia' läuft nicht – erst 'up' ausführen)"
+else
+    notify="$(docker exec authelia cat /data/notification.txt 2>/dev/null || true)"
+    # Letzter Eintrag gewinnt: die Datei wird angehängt, der jüngste Link steht
+    # unten. Bewusst über ein generisches URL-Muster statt über einen festen
+    # Pfad – der unterscheidet sich je nach Authelia-Version.
+    link="$(printf '%s' "$notify" | grep -oE 'https://[^[:space:]"<>]+' | tail -1 || true)"
+    if [[ -n "$link" ]]; then
+        subject="$(printf '%s' "$notify" | grep -E '^Subject:' | tail -1 \
+                   | cut -d: -f2- | sed 's/^ *//' || true)"
+        line "Letzte Anforderung" "${subject:-(ohne Betreff)}"
+        line "Registrierungslink" "$link"
+        echo "  -> im Browser öffnen; der Link ist kurzlebig und nur einmal gültig."
+    else
+        line "Registrierungslink" "keine offene Anforderung"
+        echo "  -> erst einen 2FA-Dienst aufrufen und dort 'Register device' klicken,"
+        echo "     danach diesen Befehl erneut ausführen."
+    fi
+fi
+echo
 echo "▶ Immich – OIDC-Client-Secret (manuell in der Immich-Admin-UI eintragen)"
 if [[ -f secrets/oidc-immich.env ]]; then
     grep -E "SECRET" secrets/oidc-immich.env | sed 's/^/  /' || true

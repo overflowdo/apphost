@@ -505,18 +505,39 @@ docker compose up -d
 
 ### Zweiter Faktor für die Admin-Oberflächen
 
-Die drei Infrastruktur-Oberflächen **Traefik-Dashboard**, **Prometheus** und **Alertmanager** stehen in `config/authelia/configuration.yml` auf `two_factor` – wer dort hineinkommt, sieht bzw. verändert die komplette Infrastruktur. Alle übrigen Dienste bleiben bei `one_factor`.
+Diese Adressen stehen in `config/authelia/configuration.yml` auf `two_factor` – wer dort hineinkommt, sieht bzw. verändert die komplette Infrastruktur oder verwaltet Konten:
 
-Beim **ersten** Aufruf einer dieser drei Adressen verlangt Authelia deshalb die Registrierung eines zweiten Faktors (TOTP-App oder WebAuthn/Passkey). Authelia verschickt dafür einen Bestätigungslink – allerdings nicht per Mail, sondern über den `filesystem`-Notifier in eine Datei im Container. Der Link wird so ausgelesen:
+| Adresse | Was dahinter liegt |
+| --- | --- |
+| `traefik.<domain>` | Reverse-Proxy-Dashboard |
+| `prometheus.<domain>` | Metriken und Query-API |
+| `alertmanager.<domain>` | Alarme, Silences |
+| `vault.<domain>/admin` | Vaultwarden-Adminpanel (Konten, Einladungen, 2FA anderer Nutzer) |
+
+Der Vaultwarden-**Tresor** selbst bleibt davon unberührt – die Bitwarden-Clients können kein Browser-SSO. Alle übrigen Dienste bleiben bei `one_factor`.
+
+Beim **ersten** Aufruf einer dieser Adressen verlangt Authelia deshalb die Registrierung eines zweiten Faktors (TOTP-App oder WebAuthn/Passkey). Authelia verschickt dafür einen Bestätigungslink – allerdings nicht per Mail, sondern über den `filesystem`-Notifier in eine Datei im Container (es ist kein SMTP konfiguriert).
+
+Der Link steht in der Ausgabe von `secrets`, zusammen mit allen anderen Zugangsdaten:
 
 ```bash
-docker exec authelia cat /data/notification.txt
+secrets        # bzw. bash /opt/monorepo/scripts/show-secrets.sh
 ```
 
-Die letzte URL in der Datei im Browser öffnen, den Faktor registrieren (TOTP: QR-Code mit einer Authenticator-App scannen), danach funktioniert der Login normal.
+```
+▶ Authelia – Zweiter Faktor (TOTP/WebAuthn)
+  Pflicht für: traefik. / prometheus. / alertmanager.<domain> und vault.<domain>/admin
+  Letzte Anforderung       Authelia: Register your mobile
+  Registrierungslink       https://auth.<domain>/one-time-code?token=…
+  -> im Browser öffnen; der Link ist kurzlebig und nur einmal gültig.
+```
+
+Reihenfolge also: geschützte Adresse aufrufen, im Portal **Register device** klicken, dann `secrets` ausführen und den Link öffnen. Danach den Faktor registrieren (TOTP: QR-Code mit einer Authenticator-App scannen) – ab dann funktioniert der Login normal.
+
+Direkt geht es weiterhin mit `docker exec authelia cat /data/notification.txt`.
 
 > [!NOTE]
-> Ohne diesen Schritt bleibt man vor einer Aufforderung stehen, die sich nicht erfüllen lässt. Wer keinen zweiten Faktor möchte, setzt die drei Domains in `config/authelia/configuration.yml` zurück auf `policy: one_factor` und startet Authelia neu (`docker compose up -d --force-recreate authelia`).
+> Ohne diesen Schritt bleibt man vor einer Aufforderung stehen, die sich nicht erfüllen lässt. Wer keinen zweiten Faktor möchte, setzt die betroffenen Regeln in `config/authelia/configuration.yml` zurück auf `policy: one_factor` und startet Authelia neu (`docker compose up -d --force-recreate authelia`).
 
 ### Kalender (Radicale) & Vorratsverwaltung (Grocy)
 
