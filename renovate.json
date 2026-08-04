@@ -43,6 +43,17 @@
       "minimumReleaseAge": "7 days"
     },
     {
+      "description": "Collabora-Hauptversionen brauchen mehr als einen Merge – Warnung in den PR schreiben, damit sie beim Entscheiden dasteht und nicht erst im Log auftaucht.",
+      "matchManagers": ["docker-compose"],
+      "matchPackageNames": ["collabora/code"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "prBodyNotes": [
+        "**Nicht ohne Prüfung mergen.** Der Sprung von 25.04 auf 26.04 hat den Container nicht mehr starten lassen: `exec: \"/bin/bash\": no such file or directory`. Das Image bringt keine bash mehr mit, der entrypoint in `compose/cloud/collabora.yml` braucht aber eine Shell.",
+        "Zu prüfen sind mindestens: die Shell im entrypoint, die `--o:`-coolwsd-Optionen in `environment:` (ändern sich zwischen Hauptversionen) und danach ein echter Öffnen-Bearbeiten-Speichern-Test aus OpenCloud heraus."
+      ]
+    },
+    {
       "description": "Zustandslose Dienste: Patch-Updates automatisch mergen. Kein persistenter Zustand, keine Migration -> Rollback ist ein Tag zurueck. Alles mit Datenbank bleibt bewusst manuell.",
       "matchManagers": ["docker-compose"],
       "matchUpdateTypes": ["patch"],
