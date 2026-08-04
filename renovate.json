@@ -43,6 +43,25 @@
       "minimumReleaseAge": "7 days"
     },
     {
+      "description": "Zustandslose Dienste: Patch-Updates automatisch mergen. Kein persistenter Zustand, keine Migration -> Rollback ist ein Tag zurueck. Alles mit Datenbank bleibt bewusst manuell.",
+      "matchManagers": ["docker-compose"],
+      "matchUpdateTypes": ["patch"],
+      "matchPackageNames": [
+        "prom/node-exporter",
+        "gcr.io/cadvisor/cadvisor",
+        "oliver006/redis_exporter",
+        "grafana/alloy",
+        "nginxinc/nginx-unprivileged",
+        "openspeedtest/latest",
+        "ghcr.io/alam00000/bentopdf-simple",
+        "ghcr.io/gethomepage/homepage",
+        "tecnativa/docker-socket-proxy"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    },
+    {
       "description": "Unpinned Container-Images sofort automatisch auf Digest pinnen, alle in einem MR",
       "matchUpdateTypes": ["pinDigest", "digest"],
       "groupName": "Pin unpinned container image digests",
