@@ -19,7 +19,14 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-90d}"
       - "--storage.tsdb.retention.size=50GB"
-      - "--web.enable-lifecycle"
+      # KEIN --web.enable-lifecycle. Der Schalter öffnet POST /-/reload UND
+      # POST /-/quit, beide ohne jede Authentifizierung – Prometheus hängt in
+      # traefik-public, also könnte jeder Container in diesem Netz das
+      # Monitoring abschalten. Gebraucht hat es im Repo nichts (kein Skript,
+      # kein Dienst ruft die Endpunkte auf; die Dashboards lesen nur
+      # prometheus_config_last_reload_*-Metriken). Preis: eine geänderte
+      # prometheus.yml oder Regeldatei wird jetzt mit
+      # `docker compose restart prometheus` übernommen statt per Reload.
       - "--no-web.enable-admin-api"
       - "--web.external-url=https://prometheus.${DOMAIN}"
       - "--log.level=warn"
@@ -48,7 +55,3 @@ services:
       - "traefik.http.routers.prometheus.entrypoints=websecure"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
       - "traefik.http.routers.prometheus.middlewares=authelia-chain@file"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Prometheus"
-      - "homepage.icon=prometheus.png"
-      - "homepage.href=https://prometheus.${DOMAIN}"

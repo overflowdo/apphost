@@ -17,6 +17,18 @@ webauthn:
   user_verification: preferred
   timeout: '60s'
 authentication_backend:
+  # Passwort-Reset und -Änderung im Portal AUSGESCHALTET, weil beide in die
+  # Nutzerdatenbank schreiben müssten – und die kann der Container nicht
+  # schreiben: secrets/authelia_users.yml gehört dem Host (0644, siehe
+  # nixos/install.sh), damit `regen-secrets` sie als apphost neu erzeugen kann.
+  # Angeboten wurde der Reset trotzdem: Wer im Anmeldefenster auf
+  # "Passwort vergessen" klickte, bekam eine Maske, an deren Ende der Schreib-
+  # versuch scheitert. Passwort ändern geht hier über die .env:
+  #   AUTHELIA_ADMIN_PASSWORD anpassen -> regen-secrets -> Authelia neu starten.
+  password_reset:
+    disable: true
+  password_change:
+    disable: true
   file:
     path: /config/users_database.yml
     watch: true
@@ -62,10 +74,15 @@ access_control:
     # Mail (kein SMTP konfiguriert). Der Alias `secrets` gibt ihn mit aus:
     #   secrets        # bzw. bash scripts/show-secrets.sh
     # Direkt geht auch: docker exec authelia cat /data/notification.txt
+    # Bichon ist ein Mail-Archiv: dahinter liegt die gesamte Korrespondenz im
+    # Volltext – auch die "Passwort zurücksetzen"-Mails aller anderen Dienste.
+    # Damit ist es mindestens so schutzbedürftig wie das Traefik-Dashboard,
+    # stand aber als einziger Dienst dieser Klasse auf one_factor.
     - domain:
         - 'traefik.{{ env "DOMAIN" }}'
         - 'prometheus.{{ env "DOMAIN" }}'
         - 'alertmanager.{{ env "DOMAIN" }}'
+        - '{{ env "BICHON_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
       policy: two_factor
     # ForwardAuth-geschützte Services (kein eigenes OIDC)
     - domain:
@@ -73,7 +90,6 @@ access_control:
         - '{{ env "DOMAIN" }}'
         - '{{ env "OPENSPEEDTEST_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
         - 'pdf.{{ env "DOMAIN" }}'
-        - '{{ env "BICHON_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
         - '{{ env "GROCY_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
         # Backup-Auslöser. Bewusst one_factor und nicht two_factor: die
         # Oberfläche kann ausschließlich ein Backup anstoßen und den Zeitpunkt

@@ -112,7 +112,12 @@ accessLog:
   # Rotation via services.logrotate in nixos/modules/security.nix).
   filePath: "/var/log/traefik/access.log"
   format: "json"
-  bufferingSize: 100
+  # KEIN bufferingSize mehr (stand auf 100). Der Puffer hält Zeilen im
+  # Speicher, bis er voll ist – fail2ban liest die Datei aber zeilenweise und
+  # sieht Fehlversuche erst, wenn sie geschrieben sind. Auf einem ruhigen
+  # System reicht ein gezielter Angriff mit fünf Versuchen nicht, um 100
+  # Zeilen zu füllen: der Ban kam erst, wenn zufällig genug anderer Verkehr
+  # nachlief. Ohne die Option schreibt Traefik synchron (Default 0).
   filters:
     # KEIN statusCodes-Filter mehr. Vorher wurden nur 400-599 protokolliert –
     # für fail2ban reichte das, für die Frage "wer hat wann welche Datei
