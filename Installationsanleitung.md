@@ -460,9 +460,18 @@ Das Installationsskript hat die `.env` bereits befüllt und alle Secrets generie
 ### Stack erstmals starten
 
 ```bash
-cd /opt/monorepo/apphost
-docker compose up -d
+cd /opt/monorepo
+up          # bzw. bash scripts/stack-up.sh
 ```
+
+> [!IMPORTANT]
+> Hier stand `cd /opt/monorepo/apphost && docker compose up -d`. Beides war
+> falsch: das Verzeichnis `apphost/` stammt aus der Monorepo-Zeit und existiert
+> nicht mehr (der Befehl bricht mit „No such file or directory“ ab), und
+> `docker compose up -d` startet **alle** Container gleichzeitig. Beim Erststart
+> schreiben Immich, OpenCloud und Paperless dann zusammen auf die USB-Platte und
+> haben Host und VM zum Absturz gebracht – genau dagegen ist
+> `scripts/stack-up.sh` (Alias `up`) gebaut, das gestaffelt hochfährt.
 
 ### OIDC-Clients einrichten
 
@@ -518,6 +527,7 @@ Diese Adressen stehen in `config/authelia/configuration.yml` auf `two_factor` �
 | `prometheus.<domain>` | Metriken und Query-API |
 | `alertmanager.<domain>` | Alarme, Silences |
 | `vault.<domain>/admin` | Vaultwarden-Adminpanel (Konten, Einladungen, 2FA anderer Nutzer) |
+| `bichon.<domain>` | Mail-Archiv – die gesamte Korrespondenz im Volltext, auch die „Passwort zurücksetzen“-Mails aller anderen Dienste |
 
 Der Vaultwarden-**Tresor** selbst bleibt davon unberührt – die Bitwarden-Clients können kein Browser-SSO. Alle übrigen Dienste bleiben bei `one_factor`.
 
@@ -595,7 +605,7 @@ Für häufige Verwaltungsaufgaben sind Shell-Aliase definiert, die nach dem Logi
 
 | Alias          | Beschreibung                                                                                                                                                   |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pull`         | Holt Repo-Updates (`git pull` in `/opt/monorepo`) – nur der `apphost/`-Pfad des Monorepos wird dabei übertragen.                                               |
+| `pull`         | Holt Repo-Updates (`git pull` in `/opt/monorepo`).                                                                                                            |
 | `update`       | `pull`, danach Flake-Inputs aktualisieren (zieht neue NixOS-Channel-Version) **und** sofort rebuilden.                                                         |
 | `rebuild`      | System neu bauen und **sofort** aktivieren, ohne Flake-Inputs zu aktualisieren. Nützlich nach Änderungen an Konfigurationsdateien.                             |
 | `rebuild-boot` | System neu bauen, Aktivierung erst **beim nächsten Neustart**. Sinnvoll, wenn Kernel-Updates ein Reboot erfordern, ohne den laufenden Betrieb zu unterbrechen. |
@@ -613,11 +623,23 @@ Für häufige Verwaltungsaufgaben sind Shell-Aliase definiert, die nach dem Logi
 | `down`          | Alle Container stoppen                                              |
 | `logs`          | Log-Stream aller Container (`docker compose logs -f`)               |
 | `status`        | Docker-Daemon-Status und laufende Container (`docker ps`)           |
-| `secrets`       | Alle Passwörter/Tokens (aus `.env` + `secrets/`) an einem Ort anzeigen |
+| `secrets`       | Alle Passwörter/Tokens (aus `.env` + `secrets/`) an einem Ort anzeigen – inklusive des Authelia-2FA-Registrierungslinks |
 | `regen-secrets` | Alle Secrets neu generieren (nach Passwortänderungen in der `.env`) |
 | `ca`            | Lokales CA-Zertifikat ausgeben (zum Import in Browser/Handy)         |
 | `backup-db`     | Anwendungskonsistente Datenbank-Dumps nach `/var/backups/apphost` ziehen (läuft sonst täglich 02:30) |
 | `help`          | Übersicht aller Verwaltungsbefehle                                  |
+
+### Backup auf die Wechselplatte
+
+| Alias           | Beschreibung                                                        |
+| --------------- | ------------------------------------------------------------------- |
+| `backup-setup`  | **Einmalig** nach der Installation: fragt die PBS-Zugangsdaten ab, legt den Verschlüsselungsschlüssel an (**ausdrucken!**) und prüft anschließend die ganze Kette |
+| `backup-check`  | Nur prüfen – läuft alles? Jederzeit gefahrlos aufrufbar             |
+| `backup-now`    | Sofort sichern, statt auf den 10-Minuten-Timer zu warten. Steckt keine Platte, passiert nichts. Gleichbedeutend mit dem Knopf auf `https://backup.<domain>` |
+| `backup-status` | Wann zuletzt gesichert, auf welche Platte, wie lange es lief        |
+| `restore-db`    | Datenbanken aus den Dumps zurückspielen (`--list` zeigt die vorhandenen an) |
+
+Einzelheiten zur Einrichtung stehen in [`proxmox/README.md`](proxmox/README.md).
 
 Nach dem Mergen eines RenovateBot-PRs genügt `up`, um die aktualisierten Images zu ziehen und die Container neu zu starten.
 
@@ -631,10 +653,18 @@ Nach dem Mergen eines RenovateBot-PRs genügt `up`, um die aktualisierten Images
 Bei Änderungen von Ntfy-, Authelia- oder anderen Secrets in der `.env` müssen diese neu generiert und der betroffene Dienst neu gestartet werden:
 
 ```bash
-vim /opt/monorepo/apphost/.env   # Passwort anpassen
-regen-secrets           # alle Secrets neu generieren
-up                      # Stack neu starten
+vim /opt/monorepo/.env   # Passwort anpassen
+regen-secrets            # alle Secrets neu generieren
+up                       # Stack neu starten
 ```
+
+> [!IMPORTANT]
+> Werte, die eines von `$ ` `` ` `` `"` `\` oder ein Leerzeichen enthalten, gehören in
+> **einfache** Anführungszeichen: `GRAFANA_ADMIN_PASSWORD='Som$merRegen'`. Die
+> `.env` wird von drei Parsern gelesen (`docker compose`, `source`, `grep`), und
+> nur so lesen alle drei denselben Wert. Ein Apostroph (`'`) im Wert selbst geht
+> nicht – dafür kennt Compose keine Fluchtsequenz. Details im Kopf von
+> `.env.example`.
 
 ---
 
@@ -643,7 +673,9 @@ up                      # Stack neu starten
 Nach der initialen Einrichtung ([Abschnitt 9](#9-aide-initialisieren)) läuft AIDE im Betrieb automatisch:
 
 - Eine **tägliche** automatische Prüfung erfolgt über einen systemd-Service.
-- Überwacht werden u. a. `/etc`, `/bin`, `/sbin`, `/lib*`, `/usr/bin`, `/usr/sbin`, `/boot` und `/opt/monorepo/apphost/config`.
+- Überwacht werden `/boot`, `/etc`, `/root`, `/home/apphost/.ssh` sowie aus dem Repo `config/`, `compose/`, `scripts/`, `nixos/`, `docker-compose.yml`, `flake.nix` und `flake.lock` (jeweils unter `/opt/monorepo`).
+- **Nicht** überwacht werden `/bin`, `/sbin`, `/lib*`, `/usr/bin` und `/usr/sbin`: die gibt es auf NixOS nicht bzw. nur als einzelne Symlinks – AIDE meldete sie schlicht als fehlend. Alles Ausführbare liegt im `/nix/store` und ist dort ohnehin hash-adressiert und read-only.
+- Ebenfalls bewusst außen vor: `.env`, `secrets/` und `data/` unter `/opt/monorepo` – die ändern sich legitim. Deshalb stehen die Repo-Pfade einzeln statt pauschal als `/opt/monorepo`.
 
 Eine manuelle Prüfung ist jederzeit möglich:
 
@@ -688,7 +720,15 @@ RenovateBot überwacht kontinuierlich das Repository und erkennt neue Versionen 
 - **Sicherheitsrelevanz:** Gepatchte Images mit Sicherheitsfixes werden zeitnah erkannt. In Kombination mit dem wöchentlichen Container-Sicherheitsscan entsteht eine kontinuierliche Angriffsflächen-Reduktion.
 
 > [!NOTE]
-> Ein vollautomatisches Mergen (ohne manuellen Review) ist mit RenovateBot ebenfalls möglich, muss jedoch explizit aktiviert werden und wurde hier zunächst bewusst nicht eingerichtet.
+> Automerge ist **teilweise aktiv** (`renovate.json`), nicht abgeschaltet:
+>
+> | Was | Verhalten |
+> | --- | --- |
+> | Digest-Pins unpinned Images (`pinDigest`, `digest`) | automatisch gemergt, gesammelt in einem PR |
+> | Patch-Updates zustandsloser Dienste (node-exporter, cAdvisor, redis_exporter, Alloy, nginx-unprivileged, openspeedtest, BentoPDF, homepage, socket-proxy) | automatisch gemergt nach 3 Tagen Reifezeit |
+> | Alles mit Datenbank oder Migration (Immich, Paperless, OpenCloud, Authelia, Vaultwarden, Grafana, …) | bleibt manuell |
+>
+> Die Trennlinie ist der Zustand: Dienste ohne eigene Daten lassen sich mit einem Tag zurück zurückrollen, alles andere nicht.
 
 ---
 
