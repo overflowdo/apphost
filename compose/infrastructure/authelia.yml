@@ -42,6 +42,7 @@ services:
       GROCY_SUBDOMAIN: ${GROCY_SUBDOMAIN:-grocy}
       # Für die ACL-Regel auf Vaultwardens /admin (siehe configuration.yml).
       VAULTWARDEN_SUBDOMAIN: ${VAULTWARDEN_SUBDOMAIN:-vault}
+      BACKUP_SUBDOMAIN: ${BACKUP_SUBDOMAIN:-backup}
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]

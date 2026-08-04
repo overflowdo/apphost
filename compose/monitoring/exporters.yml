@@ -14,11 +14,19 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+      # Textfile-Collector: hier legt scripts/media-backup.sh den Zeitpunkt des
+      # letzten erfolgreichen Backups je Wechselplatte ab. Nur lesend – der
+      # Container schreibt nichts (read_only: true steht unten ohnehin).
+      # Verzeichnis + Rechte legt nixos/modules/backup.nix per tmpfiles an.
+      - /var/lib/node-exporter/textfile:/textfile:ro
     command:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
       - "--path.rootfs=/rootfs"
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+      # Ohne das gäbe es keinen Weg, einen Zustand aus der VM (Backup-Alter) in
+      # Prometheus zu bekommen, den nicht irgendein Dienst selbst exportiert.
+      - "--collector.textfile.directory=/textfile"
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
     read_only: true

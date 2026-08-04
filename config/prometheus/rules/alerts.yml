@@ -146,6 +146,14 @@ groups:
           container: "authelia"
         annotations:
           summary: "Container läuft nicht: authelia"
+      - alert: ContainerDown_backup_trigger
+        expr: absent(container_last_seen{name="backup-trigger"})
+        for: 3m
+        labels:
+          severity: critical
+          container: "backup-trigger"
+        annotations:
+          summary: "Container läuft nicht: backup-trigger"
       - alert: ContainerDown_bento_pdf
         expr: absent(container_last_seen{name="bento-pdf"})
         for: 3m
@@ -404,3 +412,73 @@ groups:
           severity: critical
         annotations:
           summary: "Traefik Service nicht erreichbar: {{ $labels.service }}"
+      # Zertifikatsablauf. Bislang gab es darauf keinen Alarm, obwohl beide Wege
+      # absehbar auslaufen: Die Let's-Encrypt-Erneuerung scheitert still, sobald
+      # der Cloudflare-Token rotiert (Traefik loggt WARN, sonst passiert nichts –
+      # aufgefallen wäre es an der Browser-Warnung, also null Tage vorher). Und
+      # das Zertifikat der lokalen CA gilt 825 Tage (nixos/modules/local-ca.nix).
+      # Let's Encrypt erneuert 30 Tage vorher; 21 Tage lässt der Automatik also
+      # eine Woche Vorlauf, bevor gemeckert wird.
+      - alert: CertificateExpiringSoon
+        expr: (min by (cn) (traefik_tls_certs_not_after) - time()) / 86400 < 21
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Zertifikat läuft in {{ printf \"%.0f\" $value }} Tagen ab: {{ $labels.cn }}"
+      - alert: CertificateExpiringCritical
+        expr: (min by (cn) (traefik_tls_certs_not_after) - time()) / 86400 < 7
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Zertifikat läuft in {{ printf \"%.0f\" $value }} Tagen ab: {{ $labels.cn }}"
+          description: "Erneuerung prüfen: docker logs traefik | grep -i acme"
+  # Backup-Alarme.
+  #
+  # Die Wechselplatte hängt normalerweise NICHT am Host – es gibt also keinen
+  # Dienst, dessen Ausfall auffiele. Das Einzige, was zählt, ist das Alter der
+  # letzten Sicherung, und das kommt über den Textfile-Collector des
+  # node-exporter herein (scripts/media-backup.sh schreibt es).
+  - name: backup
+    rules:
+      # Rhythmus ist 14 Tage. 21 lässt eine Woche Luft, bevor gemeckert wird.
+      - alert: BackupOverdue
+        expr: (time() - max(apphost_backup_last_success_timestamp_seconds)) / 86400 > 21
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Letztes Backup vor {{ printf \"%.0f\" $value }} Tagen – Wechselplatte anstecken"
+      - alert: BackupCritical
+        expr: (time() - max(apphost_backup_last_success_timestamp_seconds)) / 86400 > 35
+        for: 1h
+        labels:
+          severity: critical
+          service: backup
+        annotations:
+          summary: "Seit {{ printf \"%.0f\" $value }} Tagen kein Backup"
+          description: "Fotos, Dokumente und Cloud-Dateien liegen seitdem nur auf /mnt/media."
+      # Der wichtigste der drei. Mit zwei Wechselplatten macht man genau einen
+      # Fehler: Man greift immer zur griffbereiten und merkt erst im Ernstfall,
+      # dass die zweite ein halbes Jahr alt ist. Bei 14-Tage-Wechsel sieht jede
+      # Platte alle 28 Tage einen Lauf; 70 Tage heißt, zwei Runden ausgefallen.
+      - alert: BackupRotationStalled
+        expr: (time() - apphost_backup_last_success_timestamp_seconds) / 86400 > 70
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Wechselplatte {{ $labels.disk }} seit {{ printf \"%.0f\" $value }} Tagen nicht mehr dran"
+          description: "Beim nächsten Mal diese Platte nehmen, nicht die andere."
+      # Fällt der node-exporter oder das Skript aus, verschwindet die Metrik –
+      # und mit ihr jeder Backup-Alarm. Ein stiller Ausfall der Überwachung des
+      # Backups ist derselbe Fehler wie ein stiller Ausfall des Backups.
+      - alert: BackupMetricMissing
+        expr: absent(apphost_backup_last_success_timestamp_seconds)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kein Backup-Zeitstempel vorhanden"
+          description: "Entweder ist noch nie ein Backup gelaufen (Einrichtung siehe proxmox/README.md), oder node-exporter bzw. scripts/media-backup.sh sind ausgefallen – dann ist die Überwachung des Backups blind."

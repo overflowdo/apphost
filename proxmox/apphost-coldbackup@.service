@@ -1,0 +1,30 @@
+# systemd-Unit auf dem PROXMOX-HOST.
+# Nach /etc/systemd/system/apphost-coldbackup@.service kopieren, dann:
+#   systemctl daemon-reload
+#
+# Instanzname = Datastore-Name (cold-a / cold-b). Gestartet wird sie von der
+# udev-Regel beim Anstecken, siehe 99-apphost-coldbackup.rules.
+#
+# Von Hand auslösen (z.B. zum Testen, Platte muss stecken):
+#   systemctl start apphost-coldbackup@cold-a.service
+#   journalctl -fu apphost-coldbackup@cold-a.service
+
+[Unit]
+Description=Cold backup to removable PBS datastore %i
+# Ohne PBS gibt es nichts einzuhängen.
+After=proxmox-backup-proxy.service
+Wants=proxmox-backup-proxy.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/apphost-coldbackup.sh %i
+# Der Lauf wartet auf das Medien-Backup der VM – bei der Erstsicherung von rund
+# 1,5 TB sind das Stunden. Ein Timeout würde ausgerechnet den ersten,
+# wichtigsten Lauf abschneiden.
+TimeoutStartSec=infinity
+# Wird die Platte während des Laufs abgezogen, soll die Unit sauber abbrechen
+# und ihr trap das Aushängen versuchen – kein endloses Hängen.
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

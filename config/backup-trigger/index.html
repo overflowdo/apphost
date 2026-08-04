@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backup – AppHost</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #f4f5f7; color: #1c1e21;
+  }
+  main { width: min(30rem, 92vw); }
+  .card {
+    background: #fff; border: 1px solid #dfe1e6; border-radius: 12px;
+    padding: 1.75rem; box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+  }
+  h1 { margin: 0 0 .25rem; font-size: 1.25rem; }
+  .sub { margin: 0 0 1.5rem; color: #6b7280; font-size: .875rem; }
+  dl { margin: 0 0 1.5rem; display: grid; grid-template-columns: auto 1fr; gap: .5rem 1rem; }
+  dt { color: #6b7280; font-size: .875rem; }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+  button {
+    width: 100%; padding: .8rem 1rem; font: inherit; font-weight: 600;
+    color: #fff; background: #2563eb; border: 0; border-radius: 8px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #1d4ed8; }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  .msg { margin-top: 1rem; font-size: .875rem; min-height: 1.5rem; }
+  .ok   { color: #15803d; }
+  .warn { color: #b45309; }
+  .err  { color: #b91c1c; }
+  .hint { margin-top: 1.25rem; font-size: .8125rem; color: #6b7280; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #16181d; color: #e5e7eb; }
+    .card { background: #1f2228; border-color: #33373f; }
+    dt, .sub, .hint { color: #9ca3af; }
+    .ok { color: #4ade80; } .warn { color: #fbbf24; } .err { color: #f87171; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>Archivierung</h1>
+    <p class="sub">Medien-Backup nach Proxmox Backup Server</p>
+
+    <dl>
+      <dt>Letztes Backup</dt><dd id="age">wird geladen …</dd>
+      <dt>Platte</dt><dd id="disk">–</dd>
+      <dt>Datastore</dt><dd id="store">–</dd>
+    </dl>
+
+    <button id="go">Backup jetzt starten</button>
+    <div class="msg" id="msg"></div>
+
+    <p class="hint">
+      Startet nur den Medien-Teil in der VM. Einhängen, VM-Abbild, Prune und
+      Garbage&nbsp;Collection übernimmt der Proxmox-Host beim Anstecken der
+      Platte. Steckt keine Platte, beendet sich der Lauf ohne Wirkung.
+    </p>
+  </div>
+</main>
+
+<script>
+// Statusdatei schreibt die Backup-Unit in der VM (nixos/modules/backup.nix).
+// Vor dem allerersten Lauf liefert nginx 204 ohne Inhalt – das ist kein Fehler.
+async function refresh() {
+  const age = document.getElementById('age');
+  try {
+    const r = await fetch('status.json', { cache: 'no-store' });
+    if (r.status === 204) { age.textContent = 'noch nie gelaufen'; return; }
+    if (!r.ok) throw new Error(r.status);
+    const s = await r.json();
+    const days = (Date.now() / 1000 - s.last_success) / 86400;
+    age.textContent = s.last_success
+      ? `vor ${days.toFixed(1)} Tagen (${new Date(s.last_success * 1000).toLocaleString('de-DE')})`
+      : 'noch nie gelaufen';
+    document.getElementById('disk').textContent  = s.disk  || '–';
+    document.getElementById('store').textContent = s.datastore_online
+      ? 'angesteckt' : 'nicht angesteckt';
+  } catch (e) {
+    age.textContent = 'Status nicht lesbar';
+  }
+}
+
+document.getElementById('go').addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget, msg = document.getElementById('msg');
+  btn.disabled = true;
+  msg.className = 'msg';
+  msg.textContent = 'wird ausgelöst …';
+  try {
+    // PUT, nicht GET: ein Seiteneffekt gehört nicht hinter eine Adresse, die
+    // ein Browser von sich aus vorab laden darf.
+    const r = await fetch('hook/run', { method: 'PUT', body: '' });
+    if (!r.ok && r.status !== 201 && r.status !== 204) throw new Error(r.status);
+    msg.className = 'msg ok';
+    msg.textContent = 'Ausgelöst. Der Lauf startet binnen weniger Sekunden; '
+                    + 'die Fertigmeldung kommt per ntfy.';
+  } catch (e) {
+    msg.className = 'msg err';
+    msg.textContent = 'Auslösen fehlgeschlagen (' + e.message + '). '
+                    + 'Der 10-Minuten-Timer greift trotzdem.';
+  } finally {
+    setTimeout(() => { btn.disabled = false; refresh(); }, 5000);
+  }
+});
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

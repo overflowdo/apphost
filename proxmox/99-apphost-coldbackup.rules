@@ -1,0 +1,26 @@
+# udev-Regel auf dem PROXMOX-HOST: startet das kalte Backup, sobald eine der
+# beiden Wechselplatten angesteckt wird.
+#
+# Nach /etc/udev/rules.d/99-apphost-coldbackup.rules kopieren, SERIENNUMMERN
+# ANPASSEN, dann:  udevadm control --reload
+#
+# Seriennummer ermitteln (Platte anstecken, dann):
+#   lsblk -o NAME,SIZE,SERIAL,MODEL
+#   udevadm info -q property -n /dev/sdX | grep -E 'ID_SERIAL|ID_SERIAL_SHORT'
+#
+# ID_SERIAL_SHORT und NICHT der Gerätepfad: sdb/sdc und der USB-Port wechseln
+# je nachdem, was sonst noch steckt und in welcher Reihenfolge der Kernel die
+# Geräte findet. Die Seriennummer wechselt nie. Genau daran hängt auch, WELCHE
+# der beiden Platten erkannt wird – Platte A und B sind eigene Datastores.
+#
+# ACTION=="add" nur auf der Partition (DEVTYPE=="partition"), nicht auf der
+# ganzen Platte: sonst feuert die Regel zweimal, einmal für sdX und einmal für
+# sdX1, und der zweite Lauf scheitert an der Sperre des ersten.
+
+ACTION=="add", SUBSYSTEM=="block", DEVTYPE=="partition", \
+  ENV{ID_SERIAL_SHORT}=="PLATTE_A_SERIENNUMMER_HIER", \
+  TAG+="systemd", ENV{SYSTEMD_WANTS}="apphost-coldbackup@cold-a.service"
+
+ACTION=="add", SUBSYSTEM=="block", DEVTYPE=="partition", \
+  ENV{ID_SERIAL_SHORT}=="PLATTE_B_SERIENNUMMER_HIER", \
+  TAG+="systemd", ENV{SYSTEMD_WANTS}="apphost-coldbackup@cold-b.service"

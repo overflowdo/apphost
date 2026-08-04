@@ -1,0 +1,74 @@
+name: apphost
+services:
+  # Auslöser + Statusanzeige für das Medien-Backup (Proxmox Backup Server).
+  #
+  # Warum überhaupt ein eigener Dienst: Die Backup-Kette läuft von allein – der
+  # Timer in der VM prüft alle 10 Minuten, ob der Datastore erreichbar ist
+  # (nixos/modules/backup.nix). Was fehlte, war Sichtbarkeit: ob überhaupt und
+  # wann zuletzt gesichert wurde, sieht man sonst nur per journalctl. Diese
+  # Seite zeigt es und erspart nebenbei das Warten auf den nächsten Timer-Tick.
+  #
+  # Warum KEIN Webhook-Image: der Container braucht genau eine Fähigkeit – eine
+  # leere Datei anlegen. Das kann nginx über sein DAV-Modul, und nginx steckt
+  # mit exakt diesem Digest ohnehin schon im Stack (ca-download). Kein
+  # zusätzliches Image, kein Prozess, der irgendetwas ausführt.
+  #
+  # Rechte: der Container sieht NUR /var/lib/apphost-backup/web. Er kann dort
+  # eine Datei anlegen; ihr Inhalt wird nie gelesen. Die eigentliche Arbeit
+  # macht eine systemd.path-Unit auf dem Host. Wer diesen Container übernimmt,
+  # kann Backups auslösen – mehr nicht.
+  backup-trigger:
+    image: nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
+    container_name: backup-trigger
+    restart: unless-stopped
+    runtime: runc
+    networks:
+      traefik-public: {}
+    volumes:
+      - ../../config/backup-trigger/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../config/backup-trigger/index.html:/usr/share/nginx/html/index.html:ro
+      # Einziger Schreibzugriff. Verzeichnis + Ownership legt
+      # nixos/modules/backup.nix per tmpfiles an (Container-UID 101 des
+      # nginx-Unprivileged-Images -> Host REMAP_BASE+101).
+      - /var/lib/apphost-backup/web:/srv
+    environment:
+      TZ: Europe/Berlin
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+      - /var/cache/nginx:size=8m
+      - /var/run:size=1m
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 64M}
+        reservations: {memory: 16M}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backup-trigger.rule=Host(`${BACKUP_SUBDOMAIN:-backup}.${DOMAIN}`)"
+      - "traefik.http.routers.backup-trigger.entrypoints=websecure"
+      - "traefik.http.services.backup-trigger.loadbalancer.server.port=8080"
+      - "traefik.http.routers.backup-trigger.middlewares=authelia-chain@file"
+      - "homepage.group=Infrastruktur"
+      - "homepage.name=Archivierung"
+      - "homepage.icon=mdi-harddisk"
+      - "homepage.href=https://${BACKUP_SUBDOMAIN:-backup}.${DOMAIN}"
+      - "homepage.description=Backup starten & Status"
+      # Kachel auf dem Dashboard zeigt das Backup-Alter, ohne dass man die Seite
+      # öffnen muss – das ist der Teil, der täglich etwas wert ist. Homepage holt
+      # die Datei serverseitig über das Container-Netz, nicht aus dem Browser.
+      - "homepage.widget.type=customapi"
+      - "homepage.widget.url=http://backup-trigger:8080/status.json"
+      - "homepage.widget.mappings[0].field=age_days"
+      - "homepage.widget.mappings[0].label=Tage her"
+      - "homepage.widget.mappings[1].field=disk"
+      - "homepage.widget.mappings[1].label=Platte"
+      - "homepage.widget.mappings[2].field=last_success_iso"
+      - "homepage.widget.mappings[2].label=Zuletzt"

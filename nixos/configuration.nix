@@ -325,6 +325,12 @@
     # Der Proxmox-Snapshot allein ist nur crash-, nicht anwendungskonsistent.
     backup-db = "sudo bash /opt/monorepo/scripts/backup-databases.sh";
 
+    # Nutzdaten (/mnt/media, Volumes, Repo) auf die angesteckte Wechselplatte.
+    # Läuft ohnehin von allein, sobald eine Platte steckt – das hier ist der
+    # Weg ohne Warten, identisch zum Knopf auf https://backup.<domain>.
+    backup-now = "sudo systemctl start apphost-media-backup-forced.service && journalctl -fu apphost-media-backup-forced.service";
+    backup-status = "cat /var/lib/apphost-backup/web/status.json 2>/dev/null || echo 'noch kein Backup gelaufen'";
+
     # Übersicht aller Verwaltungsbefehle
     help = "bash /opt/monorepo/scripts/help.sh";
 

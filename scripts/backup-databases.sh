@@ -73,6 +73,15 @@ SQLITE_DBS=(
     "grafana:apphost_grafana_data:grafana.db"
     "vaultwarden:apphost_vaultwarden_data:db.sqlite3"
     "paperless:apphost_paperless_data:db.sqlite3"
+    # Diese beiden fehlten. Beide halten ihren Zustand in SQLite und wurden von
+    # nichts erfasst: nicht von diesem Skript, und /mnt/media sind sie auch
+    # nicht. Im crash-konsistenten VM-Snapshot landen sie genau in dem Zustand,
+    # gegen den dieses Skript geschrieben wurde.
+    #   grocy: kompletter Vorratsbestand (Container-Pfad /config/data/grocy.db)
+    #   ntfy:  Nutzerdatenbank inkl. der Alertmanager-ACL
+    #          (auth-file in config/ntfy/server.yml -> /var/lib/ntfy/users.db)
+    "grocy:apphost_grocy_config:data/grocy.db"
+    "ntfy:apphost_ntfy_data:users.db"
 )
 
 for entry in "${SQLITE_DBS[@]}"; do

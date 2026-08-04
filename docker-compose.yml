@@ -63,3 +63,4 @@ include:
   - compose/tools/vaultwarden.yml
   - compose/tools/radicale.yml
   - compose/tools/grocy.yml
+  - compose/tools/backup-trigger.yml

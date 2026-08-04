@@ -26,6 +26,11 @@ cat <<'EOF'
     regen-secrets  Secrets neu generieren (nach Passwortänderung in .env)
     ca             Lokales CA-Zertifikat ausgeben (Import in Browser/Handy)
     backup-db      Datenbank-Dumps nach /var/backups/apphost (täglich 02:30 automatisch)
+    backup-now     Nutzdaten sofort auf die angesteckte Wechselplatte sichern.
+                   Steckt keine, passiert nichts. Läuft sonst von allein, sobald
+                   eine Platte angesteckt wird – oder per Knopf auf
+                   https://backup.<domain>
+    backup-status  Wann wurde zuletzt gesichert, auf welche Platte
 
     help           Diese Übersicht
 

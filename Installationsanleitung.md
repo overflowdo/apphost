@@ -689,7 +689,21 @@ RenovateBot überwacht kontinuierlich das Repository und erkennt neue Versionen 
 
 ## 15. Proxmox-Backups einrichten
 
-Damit die komplette `apphost`-VM im Notfall wiederhergestellt werden kann, sollten regelmäßige Backups auf Ebene von Proxmox eingerichtet werden [[2]](#quelle-2). Proxmox bringt dafür ein eigenes Werkzeug mit, das sich vollständig über die Weboberfläche steuern lässt. Es sichert die komplette VM (also Festplatten, Konfiguration, TPM, etc.), nicht nur einzelne Dateien.
+Damit die komplette `apphost`-VM im Notfall wiederhergestellt werden kann, sollten regelmäßige Backups auf Ebene von Proxmox eingerichtet werden [[2]](#quelle-2). Proxmox bringt dafür ein eigenes Werkzeug mit, das sich vollständig über die Weboberfläche steuern lässt. Es sichert die Systemplatte der VM samt Konfiguration und TPM.
+
+> [!CAUTION]
+> **vzdump sichert `/mnt/media` NICHT.** Die 4-TB-Datenplatte ist per
+> `qm set 100 -scsi1 /dev/disk/by-id/…` als physisches Gerät durchgereicht, und
+> vzdump kann ausschließlich Volumes sichern, die auf einem PVE-Storage liegen –
+> ein durchgereichtes Rohgerät wird übersprungen. Ohne eine zweite Vorkehrung
+> lägen also **Immich-Fotos, Paperless-Dokumente, OpenCloud-Dateien und
+> Radicale-Kalender auf genau einem Datenträger ohne jede Kopie**.
+>
+> Dafür gibt es das kalte Backup auf Wechselplatten: zwei USB-Platten im
+> Wechsel, die nur zum Sichern angesteckt und danach wieder abgezogen werden.
+> Einrichtung und Ablauf: **[`proxmox/README.md`](proxmox/README.md)**.
+> Ob es läuft, sagt die Kachel „Archivierung" auf dem Dashboard – und wenn
+> nicht, die Alarme `BackupOverdue` / `BackupRotationStalled` per ntfy.
 
 ### Datenbank-Dumps (läuft automatisch)
 

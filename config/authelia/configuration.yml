@@ -75,6 +75,11 @@ access_control:
         - 'pdf.{{ env "DOMAIN" }}'
         - '{{ env "BICHON_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
         - '{{ env "GROCY_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
+        # Backup-Auslöser. Bewusst one_factor und nicht two_factor: die
+        # Oberfläche kann ausschließlich ein Backup anstoßen und den Zeitpunkt
+        # des letzten anzeigen. Ein zweiter Faktor stünde in keinem Verhältnis
+        # und würde nur dazu führen, dass man den Weg umgeht.
+        - '{{ env "BACKUP_SUBDOMAIN" }}.{{ env "DOMAIN" }}'
       policy: one_factor
     # OIDC-Clients (eigene Auth, aber Authelia als Provider)
     - domain:
