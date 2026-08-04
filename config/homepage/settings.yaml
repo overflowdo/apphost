@@ -7,5 +7,11 @@ language: de
 theme: dark
 color: slate
 headerStyle: clean
-statusStyle: "dot"
 hideVersion: true
+# KEIN statusStyle mehr. Die Option bestimmt nur die DARSTELLUNG eines
+# Status – eine Quelle dafür gibt es hier nicht mehr, seit Homepage ohne
+# Docker-Anbindung läuft (siehe config/homepage/services.yaml). Sie stand also
+# für einen Punkt, der nie erscheinen konnte. Wer die Punkte zurück will,
+# braucht pro Kachel ein `siteMonitor:` – das prüft die Adresse aus dem
+# homepage-Container heraus und läuft damit über Traefik und die öffentliche
+# DNS-Auflösung zurück (Hairpin); ungetestet, deshalb hier nicht gesetzt.

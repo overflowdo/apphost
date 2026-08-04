@@ -40,6 +40,24 @@
         icon: mdi-harddisk
         href: "{{HOMEPAGE_VAR_URL_BACKUP}}"
         description: Backup starten & Status
+        # Der Teil, der täglich etwas wert ist: Backup-Alter sehen, ohne die
+        # Seite zu öffnen. Stand vorher als homepage.widget.*-Labels an
+        # compose/tools/backup-trigger.yml und wäre mit der Docker-Discovery
+        # verschwunden. Die Felder liefert scripts/media-backup.sh fertig
+        # formatiert nach /var/lib/apphost-backup/web/status.json; homepage und
+        # backup-trigger hängen beide in traefik-public, der Name löst also auf.
+        widget:
+          type: customapi
+          url: http://backup-trigger:8080/status.json
+          mappings:
+            - field: age_days
+              label: Tage her
+            - field: disk
+              label: Platte
+            - field: duration_text
+              label: Dauer
+            - field: used_percent
+              label: "% belegt"
 
 - Media:
     - Immich:

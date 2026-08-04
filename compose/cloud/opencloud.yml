@@ -79,7 +79,12 @@ services:
       - /tmp:size=1g,mode=1777
     deploy:
       resources:
-        limits: {cpus: "1.0", memory: 512M}
+        # 1G statt 512M: eine WOPI-Brücke käme mit weniger vermutlich aus, aber
+        # die Kosten der beiden Fehler sind ungleich. Zu viel Reserve kostet
+        # nichts, zu wenig heißt: Collabora-Sitzung bricht mitten im Dokument
+        # ab. Falls doch etwas abbricht, ist das hier die erste Stelle zum
+        # Nachsehen (`docker stats collaboration`).
+        limits: {cpus: "1.0", memory: 1G}
         reservations: {memory: 128M}
     networks:
       cloud-network: {}

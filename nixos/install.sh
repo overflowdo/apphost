@@ -415,6 +415,20 @@ keys = [
 ]
 with open(env_file) as f:
     content = f.read()
+
+# Fallschirm. Die Eingabemasken weisen ein ' schon vorher ab
+# (_ohne_apostroph), aber nicht jeder Wert kommt von dort: Domain,
+# ACME-Mail, Authelia-Nutzer/-Mail und der Cloudflare-Token laufen
+# ungeprüft durch. Ein ' beendet den gequoteten Wert mitten drin, und
+# Compose kennt dafür keine Fluchtsequenz – die Folge wäre eine .env, die
+# erst beim `up` verweigert wird, weit weg von der Ursache. Lieber hier
+# abbrechen und sagen, welcher Wert es ist.
+bad = [k for k in keys if "'" in os.environ[k]]
+if bad:
+    sys.exit("FEHLER: Apostroph (') nicht darstellbar in: " + ", ".join(bad)
+             + "\nBitte install.sh erneut ausführen und dort ein anderes "
+               "Zeichen wählen.")
+
 for key in keys:
     # Wert in EINFACHE Anführungszeichen, nicht $ -> $$ verdoppeln.
     #

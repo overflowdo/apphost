@@ -56,16 +56,8 @@ services:
       - "traefik.http.routers.backup-trigger.entrypoints=websecure"
       - "traefik.http.services.backup-trigger.loadbalancer.server.port=8080"
       - "traefik.http.routers.backup-trigger.middlewares=authelia-chain@file"
-      # Kachel auf dem Dashboard zeigt das Backup-Alter, ohne dass man die Seite
-      # öffnen muss – das ist der Teil, der täglich etwas wert ist. Homepage holt
-      # die Datei serverseitig über das Container-Netz, nicht aus dem Browser.
-      - "homepage.widget.type=customapi"
-      - "homepage.widget.url=http://backup-trigger:8080/status.json"
-      - "homepage.widget.mappings[0].field=age_days"
-      - "homepage.widget.mappings[0].label=Tage her"
-      - "homepage.widget.mappings[1].field=disk"
-      - "homepage.widget.mappings[1].label=Platte"
-      - "homepage.widget.mappings[2].field=duration_text"
-      - "homepage.widget.mappings[2].label=Dauer"
-      - "homepage.widget.mappings[3].field=used_percent"
-      - "homepage.widget.mappings[3].label=% belegt"
+      # Die Dashboard-Kachel mit dem Backup-Alter stand hier als
+      # homepage.widget.*-Labels. Homepage liest keine Docker-Labels mehr
+      # (siehe compose/tools/homepage.yml); das Widget steht jetzt unter
+      # "Archivierung" in config/homepage/services.yaml und holt
+      # status.json weiterhin serverseitig über das Container-Netz.
