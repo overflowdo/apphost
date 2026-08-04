@@ -146,6 +146,43 @@ services:
         limits: {cpus: "0.25", memory: 64M}
     labels:
       - "traefik.enable=false"
+  # Init-Container: setzt Eigentümer und Modus des Alloy-Datenverzeichnisses und
+  # beendet sich. Gleiches Muster wie traefik-init.
+  #
+  # Warum das nötig ist: Alloy läuft mit userns_mode: "host" als uid 0 (das
+  # Image setzt kein USER), hat aber cap_drop: [ALL] und nur DAC_READ_SEARCH –
+  # und das umgeht laut capabilities(7) NUR Lese- und Verzeichnisprüfungen.
+  # Schreiben braucht CAP_DAC_OVERRIDE. Gehört das Datenverzeichnis also nicht
+  # uid 0, scheitert schon `mkdir .../remotecfg` und Alloy bricht ab.
+  #
+  # Und es gehört ihm leicht mal nicht: der Daemon läuft mit userns-remap und
+  # legt sowohl Named Volumes als auch fehlende Bind-Quellen mit Eigentümer
+  # 100000:100000 an. Die tmpfiles-Regel in nixos/modules/docker.nix zieht das
+  # gerade – aber erst beim nächsten rebuild. Dieser Container macht den Stack
+  # unabhängig davon: er richtet das Verzeichnis bei JEDEM Start her, egal in
+  # welchem Zustand es ist.
+  #
+  # Kein zusätzliches Image: das Alloy-Image ist ein Ubuntu und bringt sh und
+  # chown mit, also derselbe gepinnte Digest wie unten.
+  alloy-init:
+    image: grafana/alloy:v1.18.0@sha256:491b0578c04983fd54fe99b587b6fab4404dc46d0dc16677bd6b00cc1140b308
+    container_name: alloy-init
+    restart: "no"
+    runtime: runc
+    userns_mode: "host"
+    network_mode: "none"
+    entrypoint: ["/bin/sh", "-c", "chown 0:0 /data && chmod 0700 /data"]
+    volumes:
+      - /var/lib/apphost-alloy:/data
+    security_opt:
+      - no-new-privileges:true
+    # Genau die drei, die chown und chmod auf einem fremden Verzeichnis
+    # brauchen. Der Container hat sonst nichts: kein Netz, ein Mount.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 32M}
   alloy:
     image: grafana/alloy:v1.18.0@sha256:491b0578c04983fd54fe99b587b6fab4404dc46d0dc16677bd6b00cc1140b308
     container_name: alloy
@@ -159,6 +196,8 @@ services:
     depends_on:
       socket-proxy:
         condition: service_healthy
+      alloy-init:
+        condition: service_completed_successfully
     userns_mode: "host"
     # KEIN /var/lib/docker/containers mehr: keine Komponente in config.alloy
     # liest die JSON-Logdateien: loki.source.docker holt die Container-Logs
@@ -178,18 +217,9 @@ services:
       # DAC_READ_SEARCH unten umgeht nur LESE-Prüfungen (capabilities(7)).
       # Also weder Eigentümer noch Schreibrecht: mkdir scheitert, und Alloy
       # bricht den initialen Load komplett ab.
-      # Der Bind-Mount gehört root:root (systemd.tmpfiles in
-      # nixos/modules/docker.nix, gleiches Muster wie /var/log/traefik) –
-      # damit schreibt Alloy als Eigentümer, ohne zusätzliche Capability.
-      #
-      # WICHTIG: Das Verzeichnis muss von tmpfiles kommen, also EIN REBUILD
-      # vorausgehen. Legt Docker eine fehlende Bind-Quelle selbst an, gehört
-      # sie unter userns-remap dem remappten Root (100000) und nicht uid 0 –
-      # dann scheitert schon `mkdir .../remotecfg` beim Start. Nachträglich
-      # geradezuziehen ist einfach, tmpfiles erzwingt Eigentümer und Modus
-      # auch an einem bestehenden Verzeichnis:
-      #   sudo chown 0:0 /var/lib/apphost-alloy   # sofort
-      #   rebuild                                 # dauerhaft
+      # Dass das Verzeichnis uid 0 gehört, stellt alloy-init oben bei jedem
+      # Start sicher – unabhängig davon, ob die tmpfiles-Regel aus
+      # nixos/modules/docker.nix schon gelaufen ist.
       # Inhalt sind nur Lesepositionen/Journal-Cursor. Dass sie damit aus
       # /var/lib/docker/volumes und dem Medien-Backup herausfallen, ist kein
       # Verlust: nach einem Restore liest Alloy ab max_age neu.
