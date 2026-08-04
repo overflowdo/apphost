@@ -57,21 +57,38 @@ services:
     userns_mode: "host"
     command:
       - "--docker=tcp://socket-proxy:2375"
+    # KEIN /:/rootfs:ro. Zusammen mit userns_mode: "host" (echter Host-Root) und
+    # CAP_DAC_READ_SEARCH – das laut capabilities(7) jede Datei-Leseprüfung
+    # umgeht – war damit der komplette Host lesbar: /opt/monorepo/.env (0600
+    # apphost, alle Klartext-Passwörter), /opt/monorepo/secrets/ (0700),
+    # /etc/shadow. Für einen Metrik-Container ist das nicht zu rechtfertigen.
+    # Gebraucht wird der Mount hier nicht: er speist machine_* und
+    # container_fs_*, und die nutzt weder ein Dashboard noch eine Alert-Regel
+    # (alle Platzangaben kommen aus node_filesystem_* vom node-exporter, der
+    # /rootfs behält, dafür aber keine Zusatz-Capability hat). Die vier
+    # Container-Alerts hängen an container_last_seen, das Dashboard an
+    # container_cpu_*/memory_*/network_* – alles aus cgroups + Docker-API.
+    # cAdvisor kommt ohne den Mount sauber hoch: manager.New() prüft
+    # os.Stat("/rootfs/proc") und setzt bei Abwesenheit inHostNamespace = true,
+    # womit machine.Info() /proc/cpuinfo direkt liest statt /rootfs/proc/cpuinfo
+    # (cadvisor v0.54.1, manager/manager.go:185-187, machine/info.go:57-63).
     volumes:
-      - /:/rootfs:ro
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
     devices:
       - /dev/kmsg
     security_opt: ['no-new-privileges:true']
-    # cap_drop fehlte hier als einzigem Container neben alloy. Zusammen mit
-    # userns_mode: "host" lief cAdvisor als echter Host-Root mit dem vollen
-    # Docker-Default-Capability-Satz – bei gemountetem /:/rootfs:ro und
-    # /var/lib/docker:ro ist das der Unterschied zwischen "liest Metriken" und
-    # "liest /etc/shadow, .env und jedes Container-Volume".
-    # DAC_READ_SEARCH bleibt, damit das Traversieren von /var/lib/docker (0710)
-    # und /dev/kmsg weiter klappt; DAC_OVERRIDE (Schreibrechte) braucht es nicht.
+    # cap_drop fehlte hier als einzigem Container neben alloy: cAdvisor lief als
+    # echter Host-Root mit dem vollen Docker-Default-Capability-Satz.
+    # DAC_READ_SEARCH bleibt als einzige, weil das Traversieren von
+    # /var/lib/docker (0710) und /dev/kmsg sonst scheitert; DAC_OVERRIDE
+    # (Schreibrechte) braucht es nicht.
+    # EHRLICH ZUM REST-RISIKO: DAC_READ_SEARCH + /var/lib/docker:ro heißt, dass
+    # dieser Container weiterhin jede Datei unterhalb des Docker-Datenverzeichnisses
+    # lesen kann – also auch Volumes wie Vaultwardens db.sqlite3. Was nicht mehr
+    # geht, ist der Rest des Hosts. Enger würde es nur ohne /var/lib/docker,
+    # dann fehlt cAdvisor die Zuordnung der Container-Dateisysteme.
     cap_drop: [ALL]
     cap_add: [DAC_READ_SEARCH]
     deploy:
@@ -137,17 +154,21 @@ services:
       socket-proxy:
         condition: service_healthy
     userns_mode: "host"
+    # KEIN /var/lib/docker/containers mehr: keine Komponente in config.alloy
+    # liest die JSON-Logdateien: loki.source.docker holt die Container-Logs
+    # über die Docker-API am socket-proxy. Der Mount zeigte unter userns-remap
+    # ("userns-remap": "default", nixos/modules/docker.nix) ohnehin ins Leere –
+    # das Datenverzeichnis des Daemons liegt dann unter
+    # /var/lib/docker/100000.100000/, die Logdateien also dort.
     volumes:
       - ../../config/alloy:/etc/alloy:ro
       - alloy_data:/var/lib/alloy/data
       - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     security_opt: ['no-new-privileges:true']
     # Wie cAdvisor: lief mit userns_mode: "host" als Host-Root mit vollem
     # Default-Capability-Satz. DAC_READ_SEARCH bleibt fürs Lesen von
-    # /var/log/journal (0640 root:systemd-journal) und
-    # /var/lib/docker/containers (0710).
+    # /var/log/journal (Verzeichnis 2755 root:systemd-journal).
     cap_drop: [ALL]
     cap_add: [DAC_READ_SEARCH]
     deploy:
