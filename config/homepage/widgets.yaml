@@ -6,3 +6,26 @@
 - greeting:
     text_size: xl
     text: Hallo User!
+# CPU-/RAM-Anzeige. Stand früher pro Kachel und kam aus der Docker-API – also
+# aus genau dem Zugang, über den GET /containers/{id}/json auch sämtliche
+# Secrets des Stacks im Klartext liefert (siehe socket-proxy in
+# compose/infrastructure/traefik.yml). Das resources-Widget braucht davon
+# nichts: es liest, was der Container selbst sieht.
+#
+# Erwartungen dazu, damit die Zahlen niemanden in die Irre führen:
+#   - Es ist EINE Anzeige für die Maschine, nicht mehr eine je Dienst. Für
+#     "welcher Container frisst gerade RAM" ist Grafana der Ort (Dashboard
+#     "cAdvisor"), das hat die Daten ohnehin.
+#   - Homepage misst aus dem Container heraus. CPU-Last und Speicher kommen aus
+#     /proc und zeigen die VM; ein Speicherlimit des Containers kann die
+#     RAM-Zahl verzerren. Wer echte Host-Werte will, bräuchte einen Agenten
+#     (glances) – ein zusätzlicher Dienst, den es hier nicht gibt.
+#   - KEIN disk: Homepage müsste dafür das jeweilige Dateisystem gemountet
+#     bekommen. Ein /-Mount in einen Container mit Ingress ist genau das, was
+#     bei cAdvisor gerade entfernt wurde. Plattenplatz steht im Grafana-
+#     Dashboard und löst als MediaDiskSpaceLow/-Critical ohnehin Alarm aus.
+- resources:
+    label: System
+    cpu: true
+    memory: true
+    uptime: true
