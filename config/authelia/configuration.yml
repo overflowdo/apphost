@@ -14,7 +14,15 @@ webauthn:
   disable: false
   display_name: 'AppHost'
   attestation_conveyance_preference: indirect
-  user_verification: preferred
+  # user_verification ist seit 4.39.0 nach selection_criteria umgezogen. Der
+  # alte Schlüssel stand hier weiter und wurde bei JEDEM Start zweimal als
+  # deprecated gemeldet – ohne automatische Übernahme, weil der Ersatzschlüssel
+  # (mit seinem Default) ebenfalls existiert. Die eingestellte Präferenz war
+  # damit wirkungslos. In der Schlüsselliste von v4.39.20
+  # (internal/configuration/schema/keys.go) gibt es nur noch die Fassung unten;
+  # attestation_conveyance_preference bleibt dagegen oben stehen.
+  selection_criteria:
+    user_verification: preferred
   timeout: '60s'
 authentication_backend:
   # Passwort-Reset und -Änderung im Portal AUSGESCHALTET, weil beide in die

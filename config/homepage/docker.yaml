@@ -1,0 +1,21 @@
+# Absichtlich LEER – aber die Datei muss existieren.
+#
+# Homepage hat hier früher den socket-proxy stehen und darüber die Kacheln aus
+# `homepage.*`-Docker-Labels eingesammelt. Das ist entfallen: über die Docker-API
+# liefert GET /containers/{id}/json das komplette .Config.Env jedes Containers,
+# also sämtliche Secrets des Stacks im Klartext (Begründung am socket-proxy in
+# compose/infrastructure/traefik.yml). Die Kacheln stehen jetzt statisch in
+# services.yaml.
+#
+# WARUM DIE DATEI TROTZDEM BLEIBT: servicesFromDocker() ruft bedingungslos
+# checkAndCopyConfig("docker.yaml") auf (src/utils/config/service-helpers.js).
+# Fehlt die Datei, versucht Homepage, sein Skelett hierher zu kopieren – das
+# schlägt fehl, weil /app/config dem Host gehört und der Container als
+# unprivilegierter Nutzer läuft – und beendet sich dann mit exit(1). Ergebnis
+# war ein Neustart-Kreisel und ein totes Dashboard.
+#
+# Eine kommentar-only Datei lädt als null; servicesFromDocker() gibt dann eine
+# leere Liste zurück und niemand spricht mit Docker. Genau das ist gewollt.
+#
+# Also: NICHT löschen. Wer Docker-Discovery zurückwill, trägt hier wieder einen
+# Server ein – und muss homepage dann erneut ins socket-proxy-Netz hängen.

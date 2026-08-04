@@ -181,9 +181,15 @@ services:
       # Der Bind-Mount gehört root:root (systemd.tmpfiles in
       # nixos/modules/docker.nix, gleiches Muster wie /var/log/traefik) –
       # damit schreibt Alloy als Eigentümer, ohne zusätzliche Capability.
-      # Legt Docker das Verzeichnis an, weil tmpfiles noch nicht lief, gehört
-      # es ebenfalls root:root; der Weg funktioniert also auch vor dem
-      # nächsten rebuild.
+      #
+      # WICHTIG: Das Verzeichnis muss von tmpfiles kommen, also EIN REBUILD
+      # vorausgehen. Legt Docker eine fehlende Bind-Quelle selbst an, gehört
+      # sie unter userns-remap dem remappten Root (100000) und nicht uid 0 –
+      # dann scheitert schon `mkdir .../remotecfg` beim Start. Nachträglich
+      # geradezuziehen ist einfach, tmpfiles erzwingt Eigentümer und Modus
+      # auch an einem bestehenden Verzeichnis:
+      #   sudo chown 0:0 /var/lib/apphost-alloy   # sofort
+      #   rebuild                                 # dauerhaft
       # Inhalt sind nur Lesepositionen/Journal-Cursor. Dass sie damit aus
       # /var/lib/docker/volumes und dem Medien-Backup herausfallen, ist kein
       # Verlust: nach einem Restore liest Alloy ab max_age neu.
