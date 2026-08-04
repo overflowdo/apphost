@@ -22,7 +22,7 @@ jobs:
     name: docker compose config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Platzhalter-.env und Secret-Dateien anlegen
         # Die echten Werte stehen nie im Repo; für "config" genügen Attrappen.
         # Fehlen die per Bind-Mount eingehängten Secret-Dateien, bricht compose
@@ -65,7 +65,7 @@ jobs:
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Syntax
         run: |
@@ -80,7 +80,7 @@ jobs:
     name: yamllint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: pip install yamllint
       - name: yamllint
         # config/authelia/configuration.yml ist ein Go-Template, kein reines YAML.
@@ -92,7 +92,7 @@ jobs:
     name: nix
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v27
         with:
           extra_nix_config: "experimental-features = nix-command flakes"
@@ -138,7 +138,7 @@ jobs:
     # ntfy-Anführungszeichen, Alloy-Quellen) – die fängt erst das Werkzeug des
     # jeweiligen Dienstes. Alle vier laufen als Einzeiler im passenden Image.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: promtool (Prometheus-Regeln und -Konfiguration)
         run: |
           set -euo pipefail
