@@ -78,7 +78,9 @@ loki.process "drop_noise" {
 //
 // Voraussetzungen, damit das im Container funktioniert (alle erfüllt):
 //   - /var/log ist read-only gemountet, darin liegt /var/log/journal. Nur Lesen
-//     nötig; den Cursor legt Alloy unter --storage.path ab (Volume alloy_data).
+//     nötig; den Cursor legt Alloy unter --storage.path ab. Das ist ein
+//     Bind-Mount auf /var/lib/apphost-alloy (root:root) und bewusst kein Named
+//     Volume – warum, steht in compose/monitoring/exporters.yml.
 //   - Das Alloy-Image setzt bewusst KEIN USER, der Prozess läuft als root und
 //     darf die Journal-Dateien (0640 root:systemd-journal) lesen. Der Hinweis in
 //     der Alloy-Doku, den alloy-Nutzer in die Gruppen adm/systemd-journal zu

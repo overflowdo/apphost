@@ -122,6 +122,11 @@ in
     # Traefik-Access-Log (fail2ban-Jail traefik-auth in modules/security.nix liest
     # es). Der Traefik-Container läuft als Container-root -> Host-UID = remapBase.
     "d /var/log/traefik 0750 ${toString userns.remapBase} ${toString userns.remapBase} -"
+    # Alloys Lesepositionen. Hier NICHT remapBase, sondern root: der
+    # Alloy-Container läuft mit userns_mode: "host" als echter Host-Root und hat
+    # ohne CAP_DAC_OVERRIDE keinen Weg in ein Verzeichnis, das ihm nicht gehört
+    # (siehe die Begründung in compose/monitoring/exporters.yml).
+    "d /var/lib/apphost-alloy 0700 root root -"
   ];
 
   # Containerd (für Kata Containers)

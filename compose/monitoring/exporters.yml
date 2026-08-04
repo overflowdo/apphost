@@ -1,6 +1,4 @@
 name: apphost
-volumes:
-  alloy_data: {name: apphost_alloy_data}
 services:
   node-exporter:
     image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
@@ -170,7 +168,26 @@ services:
     # /var/lib/docker/100000.100000/, die Logdateien also dort.
     volumes:
       - ../../config/alloy:/etc/alloy:ro
-      - alloy_data:/var/lib/alloy/data
+      # BIND-MOUNT statt Named Volume, sonst startet Alloy nicht:
+      #   mkdir /var/lib/alloy/data/loki.source.journal.host: permission denied
+      # Das Image setzt kein USER (Dockerfile v1.18.0), der Container läuft
+      # also als uid 0 – mit userns_mode: "host" als echter Host-Root. Der
+      # Docker-Daemon läuft aber mit userns-remap, und ein Named Volume legt
+      # er deshalb mit Eigentümer 100000:100000 an. uid 0 ist ohne
+      # CAP_DAC_OVERRIDE ganz normalen Rechteprüfungen unterworfen –
+      # DAC_READ_SEARCH unten umgeht nur LESE-Prüfungen (capabilities(7)).
+      # Also weder Eigentümer noch Schreibrecht: mkdir scheitert, und Alloy
+      # bricht den initialen Load komplett ab.
+      # Der Bind-Mount gehört root:root (systemd.tmpfiles in
+      # nixos/modules/docker.nix, gleiches Muster wie /var/log/traefik) –
+      # damit schreibt Alloy als Eigentümer, ohne zusätzliche Capability.
+      # Legt Docker das Verzeichnis an, weil tmpfiles noch nicht lief, gehört
+      # es ebenfalls root:root; der Weg funktioniert also auch vor dem
+      # nächsten rebuild.
+      # Inhalt sind nur Lesepositionen/Journal-Cursor. Dass sie damit aus
+      # /var/lib/docker/volumes und dem Medien-Backup herausfallen, ist kein
+      # Verlust: nach einem Restore liest Alloy ab max_age neu.
+      - /var/lib/apphost-alloy:/var/lib/alloy/data
       - /var/log:/var/log:ro
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     security_opt: ['no-new-privileges:true']
