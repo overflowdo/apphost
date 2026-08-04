@@ -26,6 +26,42 @@ den Datastore: Der Host sieht, wann ein neuer Medien-Snapshot da ist; die VM
 fragt alle 10 Minuten, ob der Datastore antwortet. Das einzige Geheimnis ist ein
 PBS-API-Token in der VM, das nur anlegen und lesen darf.
 
+## Die Wechselplatten werden NICHT an die VM durchgereicht
+
+> [!CAUTION]
+> **Kein `qm set 100 -scsi2 …` für `cold-a`/`cold-b`.** Die Wechselplatten
+> bleiben beim Host. PBS läuft dort, hängt den Datastore selbst ein und ist der
+> einzige, der die Platte anfasst. Reicht man sie zusätzlich an die VM durch,
+> kann PBS sie nicht mehr einhängen (das Gerät ist von QEMU belegt) – und im
+> schlimmsten Fall schreiben zwei Systeme auf dasselbe Dateisystem.
+
+Hier sind zwei völlig verschiedene Platten im Spiel, die leicht verwechselt
+werden:
+
+| Platte | Wo | Durchgereicht? | Konfiguration |
+|---|---|---|---|
+| **Datenplatte** 4 TB → `/mnt/media` | in der VM sichtbar | **ja**, als `scsi1` | `qm set 100 -scsi1 …`, steht dauerhaft in `/etc/pve/qemu-server/100.conf`; Mount via `nixos/modules/media-disk.nix` |
+| **Wechselplatten** `cold-a` (4 TB) / `cold-b` (5 TB) | nur am Host | **nein** | udev-Regel + PBS-Datastore, siehe unten |
+
+Für beide ist **nichts weiter einzurichten**, damit es nach einem Neustart oder
+beim Anstecken automatisch funktioniert:
+
+- Die Datenplatte steht in der VM-Konfiguration und wird bei jedem Start der VM
+  wieder angehängt. Der `by-id`-Pfad ist stabil.
+- Die Wechselplatten brauchen **keinen fstab-Eintrag und keinen Automounter**.
+  Das Anstecken erkennt die udev-Regel an der Seriennummer, das Einhängen macht
+  PBS über `datastore mount`, das Aushängen erledigt das Skript am Ende. Ein
+  zusätzlicher fstab-Eintrag würde PBS dabei nur in die Quere kommen.
+
+> [!NOTE]
+> `scripts/proxmox-harden.sh` setzt `blacklist uas` in
+> `/etc/modprobe.d/99-disable-usb.conf`. Die Wechselplatten laufen deshalb im
+> BOT-Modus statt mit UAS. Für die vielen kleinen Chunk-Dateien eines
+> PBS-Datastores kann das spürbar sein – beim ersten Lauf die Übertragungsrate
+> im Blick behalten (`journalctl -fu apphost-coldbackup@cold-a`). Ist sie
+> unbrauchbar, lässt sich UAS gezielt für diese beiden Seriennummern wieder
+> zulassen, statt die Blacklist ganz zu entfernen.
+
 ## Einmalige Einrichtung
 
 ### 1. PBS auf dem Host installieren
