@@ -13,7 +13,20 @@ cd "$ROOT_DIR"
 
 # || true: grep liefert bei keinem Treffer Exit 1 -> mit `set -o pipefail` würde
 # eine Zuweisung `x="$(env_val …)"` das Skript unter `set -e` abbrechen.
-env_val()  { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2- || true; }
+#
+# install.sh schreibt die Werte einfach gequotet ('…'), damit docker compose,
+# `source` und grep alle denselben Wert lesen (vorher wurde $ zu $$ verdoppelt –
+# richtig nur für compose). Hier deshalb das äußere Quote-Paar wieder abziehen.
+# Bewusst nur das äußere: ein " oder ' innerhalb des Passworts bleibt stehen.
+env_val() {
+    local v
+    v="$(grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2- || true)"
+    case "$v" in
+        \'*\') v="${v#\'}"; v="${v%\'}" ;;
+        \"*\") v="${v#\"}"; v="${v%\"}" ;;
+    esac
+    printf '%s' "$v"
+}
 file_val() { [[ -f "$1" ]] && cat "$1" || echo "(fehlt – ggf. 'up' bzw. regen-secrets ausführen)"; }
 line()     { printf '  %-24s %s\n' "$1" "$2"; }
 hr()       { printf '%s\n' "══════════════════════════════════════════════════════════════"; }

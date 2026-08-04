@@ -22,6 +22,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Altlast aus einer früheren Installation melden: nixos/install.sh hat Werte
+# einmal mit verdoppeltem $ ($$) in die .env geschrieben. Das ist nur für
+# docker compose richtig – `source` in den update-secrets-*-Skripten macht aus
+# $$ die Prozess-ID, liest also bei jedem Lauf ein anderes Passwort. Wer damit
+# `regen-secrets` ausführt, bekommt einen Argon2-Hash zu einem Wert, den
+# niemand kennt, und kommt nicht mehr ins SSO. Nur melden, nicht selbst
+# umschreiben: welche Schreibweise gemeint war, weiß nur der Mensch davor.
+if [[ -f .env ]] && grep -qE '^[[:space:]]*[A-Z_][A-Z0-9_]*=[^'"'"'"#]*\$\$' .env; then
+    echo "  ! Hinweis: in der .env stehen Werte mit verdoppeltem \$ (\$\$):"
+    grep -nE '^[[:space:]]*[A-Z_][A-Z0-9_]*=[^'"'"'"#]*\$\$' .env | cut -d= -f1 | sed 's/^/      Zeile /'
+    echo "    Diese Schreibweise lesen 'docker compose' und 'source' unterschiedlich."
+    echo "    Richtig ist der Wert in einfachen Anführungszeichen, also"
+    echo "        KEY='Som\$merRegen'    statt    KEY=Som\$\$merRegen"
+    echo "    Solange du sie nicht anfasst, laufen die Container weiter – aber"
+    echo "    'regen-secrets' erzeugt daraus falsche Passwörter. Siehe .env.example."
+    echo
+fi
+
 # "<datei>:<generator>" – alle Dateien, die in compose/**/*.yml per Bind-Mount
 # eingehängt werden. Neue secret-basierte Dienste hier ergänzen.
 SECRETS=(

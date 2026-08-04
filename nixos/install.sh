@@ -290,6 +290,17 @@ _prompt() {
     printf '%s' "$val"
 }
 
+# Werte landen in .env als 'einfach gequotet' (siehe der Python-Block weiter
+# unten). Damit lesen docker compose, `source` und grep denselben Wert – aber
+# ein ' im Wert selbst lässt sich in einer .env nicht escapen: Compose kennt
+# dafür keine Fluchtsequenz, der Wert würde mitten drin enden. Deshalb hier
+# abweisen statt später ein halbes Passwort zu speichern.
+_ohne_apostroph() {  # <wert>  -> 0 = in Ordnung
+    [[ "$1" != *"'"* ]] && return 0
+    warn "Ein Apostroph (') lässt sich in der .env nicht darstellen. Bitte ein anderes Zeichen wählen."
+    return 1
+}
+
 ENV_DOMAIN=""
 while [[ -z "$ENV_DOMAIN" ]]; do
     ENV_DOMAIN=$(_prompt "Domain – öffentlich für Let's Encrypt (z.B. example.com) oder lokal (z.B. apphost.lan)")
@@ -312,6 +323,7 @@ ENV_AUTH_EMAIL=$(_prompt "Authelia Admin-E-Mail" "$ENV_ACME_EMAIL")
 ENV_AUTH_PW=""
 while true; do
     ENV_AUTH_PW=$(_prompt  "Authelia Admin-Passwort" "" secret)
+    _ohne_apostroph "$ENV_AUTH_PW" || continue
     ENV_AUTH_PW2=$(_prompt "Authelia Admin-Passwort (bestätigen)" "" secret)
     [[ "$ENV_AUTH_PW" == "$ENV_AUTH_PW2" ]] && break
     warn "Passwörter stimmen nicht überein."
@@ -331,6 +343,7 @@ _prompt_pw_or_random() {
     while true; do
         pw=$(_prompt "$label (leer = zufällig)" "" secret)
         [[ -z "$pw" ]] && { _randhex; return; }
+        _ohne_apostroph "$pw" || continue
         pw2=$(_prompt "$label bestätigen" "" secret)
         [[ "$pw" == "$pw2" ]] && { printf '%s' "$pw"; return; }
         warn "Passwörter stimmen nicht überein."
@@ -403,8 +416,24 @@ keys = [
 with open(env_file) as f:
     content = f.read()
 for key in keys:
-    # Escapen von $ -> $$, damit docker-compose die Variablen nicht interpoliert
-    value = os.environ[key].replace('$', '$$')
+    # Wert in EINFACHE Anführungszeichen, nicht $ -> $$ verdoppeln.
+    #
+    # Die .env hat drei Leser, und die Verdopplung war nur für einen richtig:
+    #   docker compose            'Som$$merRegen' -> Som$merRegen   richtig
+    #   source (update-secrets-*) 'Som$$merRegen' -> Som<PID>merRegen, bei
+    #                             jedem Lauf anders – und ein Backtick im Wert
+    #                             lief als Befehl, hier als root
+    #   grep (show-secrets)       zeigt Som$$merRegen an
+    # Ein Passwort mit $ hieß damit: der Argon2-Hash in authelia_users.yml
+    # gehört zu einem Wert, den niemand mehr kennt -> kein Login mehr am SSO,
+    # das vor fast allem steht. Denselben Weg geht der Vaultwarden-Argon2-Hash,
+    # der immer mehrere $ enthält.
+    #
+    # Einfache Quotes sind in allen drei Parsern literal (getestet mit
+    # $ ` " \ ${} $$ und Leerzeichen). Ein ' im Wert selbst geht nicht – dafür
+    # kennt Compose keine Fluchtsequenz; solche Eingaben weist install.sh
+    # oben ab (_ohne_apostroph).
+    value = "'" + os.environ[key] + "'"
     pattern = rf'^({re.escape(key)}=).*'
     new, n = re.subn(pattern, lambda m: m.group(1) + value, content, flags=re.MULTILINE)
     content = new if n else content + f'\n{key}={value}'
