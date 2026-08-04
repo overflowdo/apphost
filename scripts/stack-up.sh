@@ -61,8 +61,16 @@ phase() {
 # Datei, weil der Alias `up-all` (docker compose up -d) sie ebenfalls aufruft.
 bash scripts/ensure-secrets.sh
 
+# Wer hier fehlt, wird von `up` NIE gestartet – auch wenn er in der
+# include-Liste von docker-compose.yml steht. Genau das war mit backup-trigger
+# passiert: der Container existierte nicht, das Dashboard zeigte einen roten
+# Punkt und Traefik ein 404, weil es ohne Container keinen Router gibt.
+# Die CI gleicht diese Liste seitdem gegen den gerenderten Stack ab
+# (.github/workflows/ci.yml, Schritt "Startphasen gegen den Stack abgleichen").
+# Nicht aufzuführen sind nur Container, die per depends_on mitkommen –
+# socket-proxy hängt an Traefik, traefik-init und alloy-init an ihren Diensten.
 phase "Phase 1  – Reverse Proxy + SSO"        traefik authelia
-phase "Phase 2  – leichte Dienste (SSD)"      homepage ntfy bichon vaultwarden openspeedtest bento-pdf ca-download radicale grocy
+phase "Phase 2  – leichte Dienste (SSD)"      homepage ntfy bichon vaultwarden openspeedtest bento-pdf ca-download radicale grocy backup-trigger
 phase "Phase 3  – Monitoring"                 prometheus grafana loki alertmanager node-exporter cadvisor alloy
 phase "Phase 4  – Immich: DB + Cache"         immich-postgres immich-redis
 phase "Phase 4b – Immich: Server"             immich-server

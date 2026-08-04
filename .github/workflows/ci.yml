@@ -202,6 +202,46 @@ jobs:
               raise SystemExit(1)
           print(f"{len(regeln)} ContainerDown-Regeln, deckungsgleich mit dem Stack.")
           PYEOF
+      - name: Startphasen gegen den Stack abgleichen
+        # scripts/stack-up.sh (Alias `up`) startet Dienste namentlich in
+        # Phasen. Steht ein Dienst in der include-Liste, aber in keiner Phase,
+        # startet ihn niemand – der Container existiert schlicht nicht, das
+        # Dashboard zeigt einen roten Punkt und Traefik ein 404, weil es ohne
+        # Container keinen Router gibt. Genau so war backup-trigger monatelang
+        # tot. Von Hand faellt das nicht auf, weil beide Listen an
+        # verschiedenen Stellen liegen.
+        run: |
+          set -euo pipefail
+          docker compose config > /tmp/rendered.yml
+          python3 - <<'PYEOF'
+          import re, yaml
+          rendered = yaml.safe_load(open("/tmp/rendered.yml"))["services"]
+          dauerhaft = {n for n, s in rendered.items() if s.get("restart") not in (None, "no")}
+          phasen = set()
+          for m in re.finditer(r'^phase\s+"[^"]*"\s+(.*)$',
+                               open("scripts/stack-up.sh").read(), re.M):
+              phasen |= set(m.group(1).split())
+          # Was per depends_on mitkommt, muss nicht in einer Phase stehen
+          # (socket-proxy haengt an Traefik, die *-init-Container an ihren
+          # Diensten). Huelle bilden, bis nichts Neues mehr dazukommt.
+          erreichbar = set(phasen)
+          while True:
+              neu = {d for n in erreichbar if n in rendered
+                       for d in (rendered[n].get("depends_on") or {})}
+              if neu <= erreichbar:
+                  break
+              erreichbar |= neu
+          nie = dauerhaft - erreichbar
+          tippfehler = phasen - set(rendered)
+          if nie:
+              print("::error::Wird von `up` nie gestartet:", ", ".join(sorted(nie)))
+          if tippfehler:
+              print("::error::In stack-up.sh genannt, aber kein Dienst:",
+                    ", ".join(sorted(tippfehler)))
+          if nie or tippfehler:
+              raise SystemExit(1)
+          print(f"{len(dauerhaft)} dauerhafte Dienste, alle von `up` erreicht.")
+          PYEOF
       - name: alloy fmt (Syntaxprüfung)
         # Bewusst OHNE --test: das schlägt auch bei reinen Formatierungs-
         # unterschieden fehl (Einrückung, Ausrichtung der =). Uns interessiert
