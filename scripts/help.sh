@@ -26,11 +26,17 @@ cat <<'EOF'
     regen-secrets  Secrets neu generieren (nach Passwortänderung in .env)
     ca             Lokales CA-Zertifikat ausgeben (Import in Browser/Handy)
     backup-db      Datenbank-Dumps nach /var/backups/apphost (täglich 02:30 automatisch)
-    backup-now     Nutzdaten sofort auf die angesteckte Wechselplatte sichern.
-                   Steckt keine, passiert nichts. Läuft sonst von allein, sobald
-                   eine Platte angesteckt wird – oder per Knopf auf
-                   https://backup.<domain>
-    backup-status  Wann wurde zuletzt gesichert, auf welche Platte
+
+  Backup auf Wechselplatte
+    backup-setup   EINMALIG nach der Installation: fragt die PBS-Zugangsdaten
+                   ab, legt den Verschlüsselungsschlüssel an (AUSDRUCKEN!) und
+                   prüft danach die ganze Kette
+    backup-check   Nur prüfen – läuft alles? (jederzeit gefahrlos)
+    backup-now     Sofort sichern, statt auf den 10-Minuten-Timer zu warten.
+                   Steckt keine Platte, passiert nichts. Gleiches wie der Knopf
+                   auf https://backup.<domain>
+    backup-status  Wann zuletzt gesichert, auf welche Platte, wie lange es lief
+    restore-db     Datenbanken aus den Dumps zurückspielen (--list zeigt sie an)
 
     help           Diese Übersicht
 

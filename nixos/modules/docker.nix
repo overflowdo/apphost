@@ -156,17 +156,42 @@ in
     # – bei wöchentlich neuen CVEs wäre das ein Dauerton. Stattdessen steht
     # die Anzahl am Ende des Logs.
     onFailure   = [ "apphost-notify-failure@%n.service" ];
+    # jq: der Scan zaehlt jetzt Funde statt Textzeilen (siehe unten).
+    path = [ pkgs.docker pkgs.trivy pkgs.jq pkgs.coreutils ];
     script      = ''
-      docker ps --format "{{.Image}}" | sort -u | while read image; do
-        ${pkgs.trivy}/bin/trivy image --severity HIGH,CRITICAL \
-          --exit-code 0 --no-progress "$image" 2>/dev/null || true
-      done | tee /var/log/docker-security-scan.log
+      LOG=/var/log/docker-security-scan.log
+      : > "$LOG"
+      crit=0
+      high=0
+
+      # Vorher stand hier `grep -c "HIGH"` bzw. `grep -c "CRITICAL"` ueber der
+      # Tabellenausgabe. Das zaehlt ZEILEN, die das Wort enthalten – also auch
+      # Kopfzeilen, Paketnamen und CVE-Beschreibungen, in denen "CRITICAL"
+      # vorkommt. Die Zahl unter "Zusammenfassung" war damit frei erfunden, und
+      # zwar in beide Richtungen: Mehrfachtreffer pro Zeile fehlten, dafuer
+      # zaehlte jede erwaehnende Zeile mit. Jetzt kommt sie aus dem JSON, das
+      # trivy ohnehin erzeugen kann – ein Lauf je Image, kein zweiter Durchgang.
+      for image in $(docker ps --format "{{.Image}}" | sort -u); do
+        json=$(trivy image --severity HIGH,CRITICAL --exit-code 0 \
+                 --no-progress --format json "$image" 2>/dev/null || echo '{}')
+        c=$(printf '%s' "$json" | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' 2>/dev/null || echo 0)
+        h=$(printf '%s' "$json" | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")]     | length' 2>/dev/null || echo 0)
+        crit=$((crit + c))
+        high=$((high + h))
+
+        printf '\n=== %s  (CRITICAL=%s HIGH=%s)\n' "$image" "$c" "$h" >> "$LOG"
+        # Nur die Zeilen, die man tatsaechlich braucht – inklusive der Frage,
+        # ob es ueberhaupt einen Fix gibt. Ohne die ist eine CVE-Liste nur eine
+        # Liste.
+        printf '%s' "$json" \
+          | jq -r '.Results[]?.Vulnerabilities[]?
+                   | "  \(.Severity)\t\(.VulnerabilityID)\t\(.PkgName) \(.InstalledVersion) -> \(.FixedVersion // "kein Fix verfuegbar")"' \
+            2>/dev/null | sort -u >> "$LOG" || true
+      done
 
       # Kurzfazit ans Ende, damit man nicht das ganze Log lesen muss.
-      HIGH=$(grep -c "HIGH" /var/log/docker-security-scan.log || true)
-      CRIT=$(grep -c "CRITICAL" /var/log/docker-security-scan.log || true)
-      echo "Zusammenfassung: $CRIT CRITICAL-, $HIGH HIGH-Zeilen (Details: less /var/log/docker-security-scan.log)" \
-        | tee -a /var/log/docker-security-scan.log
+      echo "" >> "$LOG"
+      echo "Zusammenfassung: $crit CRITICAL, $high HIGH (Details: less $LOG)" | tee -a "$LOG"
     '';
     serviceConfig = {
       Type = "oneshot";

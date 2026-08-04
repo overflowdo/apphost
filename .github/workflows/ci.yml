@@ -209,7 +209,12 @@ jobs:
         # scheitert `fmt` ebenfalls, nur ohne kosmetische Fehlalarme.
         run: |
           docker run --rm -v "$PWD/config/alloy:/etc/alloy:ro" \
-            grafana/alloy:v1.17.1 fmt /etc/alloy/config.alloy > /dev/null
+            grafana/alloy:v1.18.0 fmt /etc/alloy/config.alloy > /dev/null
+      # ACHTUNG bei Alloy-Updates: Renovate zieht diese Zeile NICHT mit.
+      # Der docker-compose-Manager greift nur in compose/, und ein `docker run`
+      # in einem run:-Schritt parst kein Manager. Version muss zu
+      # compose/monitoring/exporters.yml passen, sonst prueft die CI gegen
+      # eine andere Alloy-Version als die, die laeuft.
       # authelia validate-config fehlt hier bewusst: config/authelia/configuration.yml
       # ist ein Go-Template ({{ env ... }}) und braucht zum Parsen
       # X_AUTHELIA_CONFIG_FILTERS=template, rund acht Umgebungsvariablen UND die

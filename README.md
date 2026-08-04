@@ -32,6 +32,8 @@ Die vollständige Installations‑ und Betriebsanleitung liegt in **[Installatio
 1. Proxmox‑Node bereitstellen und mit `scripts/proxmox-harden.sh` härten.
 2. NixOS‑Minimal‑ISO in Proxmox laden und eine VM anlegen (UEFI/OVMF + TPM, Secure Boot).
 3. In der VM das Repository klonen und `nixos/install.sh` ausführen – partitioniert, installiert NixOS, richtet Secure Boot ein, fragt die `.env`‑Werte ab und generiert die restlichen Secrets automatisch.
-4. Nach dem Neustart `docker compose up -d` – der komplette Stack startet hinter Traefik.
+4. Nach dem Neustart `up` – startet den kompletten Stack gestaffelt hinter Traefik
+   (`docker compose up -d` würde alles gleichzeitig hochfahren; beim Erststart
+   überlastet das den Host).
 
 Details, inklusive Betrieb und Wartung (Updates, Backups, AIDE, Renovate), siehe [Installationsanleitung.md](Installationsanleitung.md).

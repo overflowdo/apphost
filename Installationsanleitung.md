@@ -468,11 +468,16 @@ docker compose up -d
 
 `scripts/update-secrets-authelia.sh` (läuft automatisch im Installationsskript, siehe [Abschnitt 6](#6-installation)) richtet Authelia [[10]](#quelle-10) als zentralen SSO/OIDC-Provider ein. Danach sind noch ein paar Schritte nötig, damit die einzelnen Dienste die neuen Secrets übernehmen bzw. sich gegen Authelia registrieren:
 
-1. **Authelia deployen** (nur nötig, wenn Authelia-Secrets isoliert neu generiert wurden, nicht beim ersten `docker compose up -d`):
+1. **Authelia deployen** (nur nötig, wenn Authelia-Secrets isoliert neu generiert wurden, nicht beim ersten Start):
 
    ```bash
-   docker compose up -d authelia authelia-redis
+   docker compose up -d authelia
    ```
+
+   > Hier stand `docker compose up -d authelia authelia-redis`. Einen Container
+   > `authelia-redis` gibt es im Stack nicht – Authelia speichert seine Sitzungen
+   > in SQLite (`storage.local` in `config/authelia/configuration.yml`). Der Befehl
+   > wäre mit einem Fehler abgebrochen, ohne Authelia neu zu starten.
 
 2. **Immich OIDC (manuell):** Der Immich-OIDC-Client kann nicht automatisch konfiguriert werden und muss einmalig in der Immich Admin-UI eingetragen werden (siehe Immich-Dokumentation zu OAuth [[11]](#quelle-11)):
 

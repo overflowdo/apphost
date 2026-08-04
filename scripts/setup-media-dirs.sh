@@ -86,7 +86,10 @@ chmod 0755 "$JELLY"
 echo "  $JELLY -> apphost:users (0755, read-only für Jellyfin)"
 
 echo
-echo "Fertig. Jetzt Stack starten:  cd /opt/monorepo && docker compose up -d"
+# Gestaffelt starten (Alias `up`), nicht `docker compose up -d`: beim
+# gleichzeitigen Erststart schreiben Immich, OpenCloud und Paperless zusammen
+# auf die USB-Platte und spiken den RAM - das hatte Host und VM gecrasht.
+echo "Fertig. Jetzt Stack starten:  cd /opt/monorepo && bash scripts/stack-up.sh   (Alias: up)"
 echo
 echo "Falls ein Dienst 'permission denied' auf sein Datenverzeichnis loggt, läuft"
 echo "er als Nicht-root-UID N im Container. Dann für diesen Dienst:"

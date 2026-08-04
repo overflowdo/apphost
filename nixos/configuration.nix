@@ -331,6 +331,16 @@
     backup-now = "sudo systemctl start apphost-media-backup-forced.service && journalctl -fu apphost-media-backup-forced.service";
     backup-status = "cat /var/lib/apphost-backup/web/status.json 2>/dev/null || echo 'noch kein Backup gelaufen'";
 
+    # Der EINZIGE manuelle Schritt auf der VM-Seite: die Zugangsdaten zum
+    # Proxmox Backup Server. Die kommen von der anderen Maschine und können
+    # nicht im Repo liegen. Das Skript fragt nur, was fehlt, und prüft danach
+    # die komplette Kette – gefahrlos jederzeit wiederholbar.
+    backup-setup = "sudo bash /opt/monorepo/scripts/backup-setup.sh";
+    backup-check = "sudo bash /opt/monorepo/scripts/backup-setup.sh --check";
+
+    # Datenbanken aus den Dumps zurückspielen. Ohne Argument zeigt es die Hilfe.
+    restore-db = "sudo bash /opt/monorepo/scripts/restore-databases.sh";
+
     # Übersicht aller Verwaltungsbefehle
     help = "bash /opt/monorepo/scripts/help.sh";
 
