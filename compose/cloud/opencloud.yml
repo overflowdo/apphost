@@ -64,18 +64,23 @@ services:
       - "traefik.http.routers.opencloud.entrypoints=websecure"
       - "traefik.http.services.opencloud.loadbalancer.server.port=9200"
       - "traefik.http.routers.opencloud.middlewares=opencloud-chain@file"
-      - "homepage.group=Cloud"
-      - "homepage.name=OpenCloud"
-      - "homepage.icon=owncloud.png"
-      - "homepage.href=https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}"
   collaboration:
     image: opencloudeu/opencloud-rolling:7.4.0@sha256:e9df43040866c3587daae47af68bc3c412026bc99614686bf6869bdc72c52526
     container_name: collaboration
-    restart: always
+    # War der einzige Container im Stack mit restart: always statt
+    # unless-stopped (ein von Hand gestoppter Dienst kam beim nächsten
+    # Daemon-Start ungefragt wieder), ohne runtime: runc und ohne jede
+    # Ressourcengrenze – ein Speicherleck hier hätte den Host mitgenommen.
+    restart: unless-stopped
+    runtime: runc
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
     tmpfs:
       - /tmp:size=1g,mode=1777
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 512M}
+        reservations: {memory: 128M}
     networks:
       cloud-network: {}
       traefik-public: {}

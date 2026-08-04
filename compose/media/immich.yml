@@ -57,10 +57,6 @@ services:
       - "traefik.http.routers.immich.entrypoints=websecure"
       - "traefik.http.services.immich.loadbalancer.server.port=2283"
       - "traefik.http.routers.immich.middlewares=default-chain@file"
-      - "homepage.group=Media"
-      - "homepage.name=Immich"
-      - "homepage.icon=immich.png"
-      - "homepage.href=https://${IMMICH_SUBDOMAIN:-photos}.${DOMAIN}"
   immich-machine-learning:
     image: ghcr.io/immich-app/immich-machine-learning:v2.7.5@sha256:a2501141440f10516d329fdfba2c68082e19eb9ba6016c061ac80d23beadf7f3
     container_name: immich-ml

@@ -41,7 +41,3 @@ services:
       - "traefik.http.routers.ntfy.entrypoints=websecure"
       - "traefik.http.services.ntfy.loadbalancer.server.port=80"
       - "traefik.http.routers.ntfy.middlewares=default-chain@file"
-      - "homepage.group=Kommunikation"
-      - "homepage.name=Ntfy"
-      - "homepage.icon=ntfy.png"
-      - "homepage.href=https://${NTFY_SUBDOMAIN:-ntfy}.${DOMAIN}"

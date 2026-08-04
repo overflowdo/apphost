@@ -83,10 +83,6 @@ services:
       - "traefik.http.routers.paperless.entrypoints=websecure"
       - "traefik.http.services.paperless.loadbalancer.server.port=8000"
       - "traefik.http.routers.paperless.middlewares=strip-remote-user@file,default-chain@file"
-      - "homepage.group=Dokumente"
-      - "homepage.name=Paperless-NGX"
-      - "homepage.icon=paperless-ngx.png"
-      - "homepage.href=https://paperless.${DOMAIN}"
   paperless-redis:
     image: valkey/valkey:8-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
     container_name: paperless-redis

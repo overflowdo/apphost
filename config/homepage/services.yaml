@@ -1,15 +1,106 @@
 # =============================================================================
 # Homepage – Service-Konfiguration
-# Dienste sind via Docker-Labels auto-discoverable (siehe compose-Labels).
-# Diese Datei kann für manuelle Einträge oder Gruppen-Sortierung genutzt werden.
+#
+# Diese Datei ist die EINZIGE Quelle der Dienste-Kacheln. Vorher kamen sie aus
+# `homepage.*`-Docker-Labels, die Homepage über den socket-proxy eingesammelt
+# hat. Dafür brauchte homepage Zugriff auf die Docker-API – und darüber liefert
+# `GET /containers/{id}/json` das komplette .Config.Env jedes Containers, also
+# sämtliche Secrets des Stacks im Klartext (siehe den Kommentar am socket-proxy
+# in compose/infrastructure/traefik.yml). Für ein Dashboard, das Kacheln
+# anzeigt, ist das ein schlechter Tausch. Homepage hängt deshalb nicht mehr im
+# socket-proxy-Netz.
+#
+# Die Adressen kommen als {{HOMEPAGE_VAR_URL_*}} aus der Umgebung; gesetzt
+# werden sie in compose/tools/homepage.yml, wo ${DOMAIN} und die
+# ${*_SUBDOMAIN}-Variablen aus der .env noch aufgelöst werden. Homepage ersetzt
+# die Platzhalter beim Laden dieser Datei (src/utils/config/service-helpers.js,
+# servicesFromConfig -> substituteEnvironmentVars).
+#
+# NEUEN DIENST ERGÄNZEN: hier eine Kachel eintragen UND die passende
+# HOMEPAGE_VAR_URL_*-Zeile in compose/tools/homepage.yml. Ein `homepage.*`-Label
+# an der Compose-Datei bewirkt nichts mehr.
+#
 # Docs: https://gethomepage.dev/configs/services/
 # =============================================================================
 
-# Automatische Service-Discovery via Docker-Labels ist aktiviert.
-# Manuelle Einträge hier können zusätzlich ergänzt werden:
+- Infrastruktur:
+    - Traefik:
+        icon: traefik.png
+        href: "{{HOMEPAGE_VAR_URL_TRAEFIK}}"
+        description: Reverse Proxy
+    - Authelia:
+        icon: authelia.png
+        href: "{{HOMEPAGE_VAR_URL_AUTHELIA}}"
+        description: Single Sign-on
+    - CA-Zertifikat:
+        icon: mdi-certificate
+        href: "{{HOMEPAGE_VAR_URL_CA}}"
+        description: Lokale CA zum Import
+    - Archivierung:
+        icon: mdi-harddisk
+        href: "{{HOMEPAGE_VAR_URL_BACKUP}}"
+        description: Backup starten & Status
 
-# - Infrastruktur:
-#     - Router:
-#         href: https://router.local
-#         icon: router.png
-#         description: Heimnetz-Router
+- Media:
+    - Immich:
+        icon: immich.png
+        href: "{{HOMEPAGE_VAR_URL_IMMICH}}"
+        description: Fotos
+    - Jellyfin:
+        icon: jellyfin.png
+        href: "{{HOMEPAGE_VAR_URL_JELLYFIN}}"
+        description: Filme & Serien
+
+- Cloud:
+    - OpenCloud:
+        icon: owncloud.png
+        href: "{{HOMEPAGE_VAR_URL_OPENCLOUD}}"
+        description: Dateien & Office
+
+- Dokumente:
+    - Paperless-NGX:
+        icon: paperless-ngx.png
+        href: "{{HOMEPAGE_VAR_URL_PAPERLESS}}"
+        description: Dokumentenarchiv
+    - PDF-Tools:
+        icon: bentopdf.png
+        href: "{{HOMEPAGE_VAR_URL_PDF}}"
+        description: PDF bearbeiten
+
+- Kommunikation:
+    - Bichon:
+        icon: mdi-email
+        href: "{{HOMEPAGE_VAR_URL_BICHON}}"
+        description: Mail-Archiv
+    - Ntfy:
+        icon: ntfy.png
+        href: "{{HOMEPAGE_VAR_URL_NTFY}}"
+        description: Benachrichtigungen
+
+- Tools:
+    - Vaultwarden:
+        icon: vaultwarden.png
+        href: "{{HOMEPAGE_VAR_URL_VAULTWARDEN}}"
+        description: Passworttresor
+    - Kalender (Radicale):
+        icon: radicale.png
+        href: "{{HOMEPAGE_VAR_URL_RADICALE}}"
+        description: CalDAV / CardDAV
+    - Grocy:
+        icon: grocy.png
+        href: "{{HOMEPAGE_VAR_URL_GROCY}}"
+        description: Vorratsverwaltung
+    - SpeedTest:
+        icon: openspeedtest.png
+        href: "{{HOMEPAGE_VAR_URL_SPEEDTEST}}"
+        description: Durchsatz im Heimnetz
+
+- Monitoring:
+    - Grafana:
+        icon: grafana.png
+        href: "{{HOMEPAGE_VAR_URL_GRAFANA}}"
+        description: Dashboards
+    - Prometheus:
+        icon: prometheus.png
+        href: "{{HOMEPAGE_VAR_URL_PROMETHEUS}}"
+        description: Metriken

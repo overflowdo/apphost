@@ -39,7 +39,3 @@ services:
       - "traefik.http.routers.bichon.entrypoints=websecure"
       - "traefik.http.services.bichon.loadbalancer.server.port=8080"
       - "traefik.http.routers.bichon.middlewares=authelia-chain@file"
-      - "homepage.group=Kommunikation"
-      - "homepage.name=Bichon"
-      - "homepage.href=https://${BICHON_SUBDOMAIN:-bichon}.${DOMAIN}"
-      - "homepage.icon=mdi-email"

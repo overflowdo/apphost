@@ -50,7 +50,3 @@ services:
       - "traefik.http.routers.jellyfin.entrypoints=websecure"
       - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
       - "traefik.http.routers.jellyfin.middlewares=default-chain@file"
-      - "homepage.group=Media"
-      - "homepage.name=Jellyfin"
-      - "homepage.icon=jellyfin.png"
-      - "homepage.href=https://jellyfin.${DOMAIN}"

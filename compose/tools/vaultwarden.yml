@@ -76,7 +76,3 @@ services:
       - "traefik.http.routers.vaultwarden-admin.priority=110"
       - "traefik.http.routers.vaultwarden-admin.service=vaultwarden"
       - "traefik.http.routers.vaultwarden-admin.middlewares=authelia-admin-chain@file"
-      - "homepage.group=Tools"
-      - "homepage.name=Vaultwarden"
-      - "homepage.icon=vaultwarden.png"
-      - "homepage.href=https://${VAULTWARDEN_SUBDOMAIN:-vault}.${DOMAIN}"

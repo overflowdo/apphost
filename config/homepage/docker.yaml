@@ -1,2 +1,0 @@
-docker:
-  socket: tcp://socket-proxy:2375

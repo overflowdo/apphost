@@ -5,16 +5,44 @@ services:
     container_name: homepage
     restart: unless-stopped
     runtime: runc
+    # KEIN socket-proxy-Netz mehr. Homepage hat die Kacheln früher aus
+    # `homepage.*`-Docker-Labels eingesammelt und dafür die Docker-API
+    # gebraucht. Über die liefert GET /containers/{id}/json aber .Config.Env
+    # jedes Containers – sämtliche Secrets des Stacks im Klartext (Details im
+    # Kommentar am socket-proxy in compose/infrastructure/traefik.yml). Von den
+    # vier Containern im socket-proxy-Netz war homepage der einzige, der die
+    # API nur fürs Aussehen brauchte, und gleichzeitig der einzige mit
+    # Ingress. Die Kacheln stehen jetzt statisch in
+    # config/homepage/services.yaml.
     networks:
       traefik-public: {}
-      socket-proxy: {} # Docker-Widget via Socket-Proxy
     volumes:
       - ../../config/homepage:/app/config
     environment:
       TZ: Europe/Berlin
-      DOCKER_HOST: tcp://socket-proxy:2375 # Kein direkter Docker-Socket!
       LOG_LEVEL: warn
       HOMEPAGE_ALLOWED_HOSTS: "*" # we handle this through traefik
+      # Adressen für config/homepage/services.yaml. Hier stehen sie, weil nur
+      # Compose ${DOMAIN} und die ${*_SUBDOMAIN} aus der .env auflöst; Homepage
+      # ersetzt {{HOMEPAGE_VAR_...}} beim Laden der Konfiguration. Werte 1:1 aus
+      # den früheren homepage.href-Labels übernommen, inklusive Defaults.
+      HOMEPAGE_VAR_URL_TRAEFIK: https://traefik.${DOMAIN}
+      HOMEPAGE_VAR_URL_AUTHELIA: https://${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}
+      HOMEPAGE_VAR_URL_CA: https://ca.${DOMAIN}
+      HOMEPAGE_VAR_URL_BACKUP: https://${BACKUP_SUBDOMAIN:-backup}.${DOMAIN}
+      HOMEPAGE_VAR_URL_IMMICH: https://${IMMICH_SUBDOMAIN:-photos}.${DOMAIN}
+      HOMEPAGE_VAR_URL_JELLYFIN: https://jellyfin.${DOMAIN}
+      HOMEPAGE_VAR_URL_OPENCLOUD: https://${OPENCLOUD_SUBDOMAIN:-cloud}.${DOMAIN}
+      HOMEPAGE_VAR_URL_PAPERLESS: https://paperless.${DOMAIN}
+      HOMEPAGE_VAR_URL_PDF: https://pdf.${DOMAIN}
+      HOMEPAGE_VAR_URL_BICHON: https://${BICHON_SUBDOMAIN:-bichon}.${DOMAIN}
+      HOMEPAGE_VAR_URL_NTFY: https://${NTFY_SUBDOMAIN:-ntfy}.${DOMAIN}
+      HOMEPAGE_VAR_URL_VAULTWARDEN: https://${VAULTWARDEN_SUBDOMAIN:-vault}.${DOMAIN}
+      HOMEPAGE_VAR_URL_RADICALE: https://${RADICALE_SUBDOMAIN:-cal}.${DOMAIN}
+      HOMEPAGE_VAR_URL_GROCY: https://${GROCY_SUBDOMAIN:-grocy}.${DOMAIN}
+      HOMEPAGE_VAR_URL_SPEEDTEST: https://${OPENSPEEDTEST_SUBDOMAIN:-speedtest}.${DOMAIN}
+      HOMEPAGE_VAR_URL_GRAFANA: https://${GRAFANA_SUBDOMAIN:-grafana}.${DOMAIN}
+      HOMEPAGE_VAR_URL_PROMETHEUS: https://prometheus.${DOMAIN}
     user: "1000:1000"
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]

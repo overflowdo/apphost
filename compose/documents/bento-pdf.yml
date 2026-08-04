@@ -31,7 +31,3 @@ services:
       - "traefik.http.routers.bento-pdf.entrypoints=websecure"
       - "traefik.http.services.bento-pdf.loadbalancer.server.port=8080"
       - "traefik.http.routers.bento-pdf.middlewares=authelia-chain@file"
-      - "homepage.group=Dokumente"
-      - "homepage.name=PDF-Tools"
-      - "homepage.icon=bentopdf.png"
-      - "homepage.href=https://pdf.${DOMAIN}"

@@ -56,11 +56,6 @@ services:
       - "traefik.http.routers.backup-trigger.entrypoints=websecure"
       - "traefik.http.services.backup-trigger.loadbalancer.server.port=8080"
       - "traefik.http.routers.backup-trigger.middlewares=authelia-chain@file"
-      - "homepage.group=Infrastruktur"
-      - "homepage.name=Archivierung"
-      - "homepage.icon=mdi-harddisk"
-      - "homepage.href=https://${BACKUP_SUBDOMAIN:-backup}.${DOMAIN}"
-      - "homepage.description=Backup starten & Status"
       # Kachel auf dem Dashboard zeigt das Backup-Alter, ohne dass man die Seite
       # öffnen muss – das ist der Teil, der täglich etwas wert ist. Homepage holt
       # die Datei serverseitig über das Container-Netz, nicht aus dem Browser.

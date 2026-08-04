@@ -79,7 +79,3 @@ services:
       - "traefik.http.routers.authelia-login.priority=100"
       - "traefik.http.routers.authelia-login.service=authelia"
       - "traefik.http.routers.authelia-login.middlewares=auth-endpoint-chain@file"
-      - "homepage.group=Infrastruktur"
-      - "homepage.name=Authelia"
-      - "homepage.icon=authelia.png"
-      - "homepage.href=https://${AUTHELIA_SUBDOMAIN:-auth}.${DOMAIN}"

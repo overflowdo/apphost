@@ -60,8 +60,3 @@ services:
       - "traefik.docker.network=sso-header-network"
       - "traefik.http.services.grocy.loadbalancer.server.port=80"
       - "traefik.http.routers.grocy.middlewares=authelia-chain@file"
-      - "homepage.group=Tools"
-      - "homepage.name=Grocy"
-      - "homepage.icon=grocy.png"
-      - "homepage.href=https://${GROCY_SUBDOMAIN:-grocy}.${DOMAIN}"
-      - "homepage.description=Vorratsverwaltung"

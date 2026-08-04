@@ -88,7 +88,3 @@ services:
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
       - "traefik.http.routers.grafana.middlewares=strip-remote-user@file,default-chain@file"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Grafana"
-      - "homepage.icon=grafana.png"
-      - "homepage.href=https://${GRAFANA_SUBDOMAIN:-grafana}.${DOMAIN}"

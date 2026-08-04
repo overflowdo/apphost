@@ -33,7 +33,3 @@ services:
       - "traefik.http.routers.speedtest.entrypoints=websecure"
       - "traefik.http.services.speedtest.loadbalancer.server.port=3000"
       - "traefik.http.routers.speedtest.middlewares=authelia-chain@file"
-      - "homepage.group=Tools"
-      - "homepage.name=SpeedTest"
-      - "homepage.icon=openspeedtest.png"
-      - "homepage.href=https://${OPENSPEEDTEST_SUBDOMAIN:-speedtest}.${DOMAIN}"

@@ -38,8 +38,3 @@ services:
       - "traefik.http.routers.ca-download.entrypoints=websecure"
       - "traefik.http.services.ca-download.loadbalancer.server.port=8080"
       - "traefik.http.routers.ca-download.middlewares=default-chain@file"
-      - "homepage.group=Infrastruktur"
-      - "homepage.name=CA-Zertifikat"
-      - "homepage.icon=mdi-certificate"
-      - "homepage.href=https://ca.${DOMAIN}"
-      - "homepage.description=Lokale CA zum Import"

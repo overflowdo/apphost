@@ -57,12 +57,35 @@ services:
       PUT: 0
       # GRENZE DIESES PROXYS, damit sie niemand überschätzt: er filtert nach
       # HTTP-Methode und Pfadpräfix, nicht nach Endpunkt. Unter CONTAINERS=1
-      # fällt deshalb auch GET /containers/{id}/archive – damit liest sich
-      # jede Datei aus jedem Container, z.B. Vaultwardens db.sqlite3. Wer
-      # homepage, cadvisor oder alloy übernimmt, kommt darüber heran.
-      # Kein akuter Weg hinein (POST=0 schließt das Starten von Containern
-      # aus), aber der Proxy verspricht mehr Eingrenzung, als er liefert.
-      # Enger ginge es nur mit einem Proxy, der einzelne Endpunkte kennt.
+      # sind damit ZWEI Wege offen, und der zweite ist der schlimmere:
+      #
+      #   GET /containers/{id}/json     liefert .Config.Env – also ALLES, was
+      #     per environment: oder env_file: gesetzt ist, im Klartext. Compose
+      #     löst env_file clientseitig auf, die Werte stehen im Container-
+      #     Objekt. Konkret: AUTHELIA_SESSION_SECRET und
+      #     AUTHELIA_STORAGE_ENCRYPTION_KEY, Grafanas Admin-Passwort und
+      #     GF_SECURITY_SECRET_KEY, PAPERLESS_SECRET_KEY, Immichs DB-Passwort
+      #     und JWT_SECRET, die OIDC-Client-Secrets, OpenCloud-/Collabora-/
+      #     ntfy-Passwörter, Vaultwardens Token-Hash.
+      #   GET /containers/{id}/archive  liest jede Datei aus jedem Container:
+      #     secrets/authelia_oidc_jwks.pem (der RSA-Signierschlüssel – damit
+      #     lassen sich OIDC-Token für Grafana, Immich und Paperless fälschen),
+      #     Vaultwardens db.sqlite3, Traefiks TLS-Key.
+      #
+      # Das ist keine offene Tür: es braucht erst eine RCE in einem Container,
+      # der im socket-proxy-Netz hängt. Aber es ist der eine Punkt im Stack, an
+      # dem ein übernommener Nebendienst sofort alles aufmacht – genau die
+      # Eigenschaft, gegen die der Rest der Härtung gebaut ist. Deshalb hängt
+      # hier nur noch drin, wer es wirklich braucht: traefik (Labels +
+      # Netzwerke), cadvisor und alloy (Container-Discovery, Log-Tailing).
+      # Homepage ist bewusst raus, siehe compose/tools/homepage.yml.
+      #
+      # BEWUSST OFFEN: Ein filternder nginx davor, der /archive sperrt und
+      # .Config.Env aus der JSON-Antwort schneidet, wäre die echte Lösung.
+      # Dagegen steht, dass Alloys loki.source.docker über dieselbe Verbindung
+      # gestreamtes, gemultiplextes HTTP tailt – das durch einen Filter zu
+      # schleifen bricht still die Log-Sammlung. Ohne Teststellung nicht
+      # anzufassen.
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
@@ -155,8 +178,3 @@ services:
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.traefik.middlewares=authelia-chain@file"
-      - "homepage.group=Infrastruktur"
-      - "homepage.name=Traefik"
-      - "homepage.icon=traefik.png"
-      - "homepage.href=https://traefik.${DOMAIN}"
-      - "homepage.description=Reverse Proxy"
