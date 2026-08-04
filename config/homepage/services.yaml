@@ -28,18 +28,22 @@
         icon: traefik.png
         href: "{{HOMEPAGE_VAR_URL_TRAEFIK}}"
         description: Reverse Proxy
+        siteMonitor: http://traefik:8080/ping
     - Authelia:
         icon: authelia.png
         href: "{{HOMEPAGE_VAR_URL_AUTHELIA}}"
         description: Single Sign-on
+        siteMonitor: http://authelia:9091
     - CA-Zertifikat:
         icon: mdi-certificate
         href: "{{HOMEPAGE_VAR_URL_CA}}"
         description: Lokale CA zum Import
+        siteMonitor: http://ca-download:8080
     - Archivierung:
         icon: mdi-harddisk
         href: "{{HOMEPAGE_VAR_URL_BACKUP}}"
         description: Backup starten & Status
+        siteMonitor: http://backup-trigger:8080
         # Der Teil, der täglich etwas wert ist: Backup-Alter sehen, ohne die
         # Seite zu öffnen. Stand vorher als homepage.widget.*-Labels an
         # compose/tools/backup-trigger.yml und wäre mit der Docker-Discovery
@@ -64,61 +68,78 @@
         icon: immich.png
         href: "{{HOMEPAGE_VAR_URL_IMMICH}}"
         description: Fotos
+        siteMonitor: http://immich-server:2283
     - Jellyfin:
         icon: jellyfin.png
         href: "{{HOMEPAGE_VAR_URL_JELLYFIN}}"
         description: Filme & Serien
+        siteMonitor: http://jellyfin:8096
 
 - Cloud:
     - OpenCloud:
         icon: owncloud.png
         href: "{{HOMEPAGE_VAR_URL_OPENCLOUD}}"
         description: Dateien & Office
+        siteMonitor: http://opencloud:9200
 
 - Dokumente:
     - Paperless-NGX:
         icon: paperless-ngx.png
         href: "{{HOMEPAGE_VAR_URL_PAPERLESS}}"
         description: Dokumentenarchiv
+        siteMonitor: http://paperless:8000
     - PDF-Tools:
         icon: bentopdf.png
         href: "{{HOMEPAGE_VAR_URL_PDF}}"
         description: PDF bearbeiten
+        siteMonitor: http://bento-pdf:8080
 
 - Kommunikation:
     - Bichon:
         icon: mdi-email
         href: "{{HOMEPAGE_VAR_URL_BICHON}}"
         description: Mail-Archiv
+        siteMonitor: http://bichon:8080
     - Ntfy:
         icon: ntfy.png
         href: "{{HOMEPAGE_VAR_URL_NTFY}}"
         description: Benachrichtigungen
+        siteMonitor: http://ntfy:80
 
 - Tools:
     - Vaultwarden:
         icon: vaultwarden.png
         href: "{{HOMEPAGE_VAR_URL_VAULTWARDEN}}"
         description: Passworttresor
+        siteMonitor: http://vaultwarden:80
     - Kalender (Radicale):
         icon: radicale.png
         href: "{{HOMEPAGE_VAR_URL_RADICALE}}"
         description: CalDAV / CardDAV
+        siteMonitor: http://radicale:5232
     - Grocy:
         icon: grocy.png
         href: "{{HOMEPAGE_VAR_URL_GROCY}}"
         description: Vorratsverwaltung
+        # Als einziger Dienst ohne siteMonitor: Grocy hängt allein in
+        # sso-header-network und ist von homepage aus nicht erreichbar. Das
+        # Netz gibt es genau deshalb – dort vertraut ein Dienst dem
+        # Remote-User-Header, also darf nur Traefik hinein. Ein Punkt auf der
+        # Kachel ist das nicht wert.
     - SpeedTest:
         icon: openspeedtest.png
         href: "{{HOMEPAGE_VAR_URL_SPEEDTEST}}"
         description: Durchsatz im Heimnetz
+        siteMonitor: http://openspeedtest:3000
 
 - Monitoring:
     - Grafana:
         icon: grafana.png
         href: "{{HOMEPAGE_VAR_URL_GRAFANA}}"
         description: Dashboards
+        siteMonitor: http://grafana:3000
     - Prometheus:
         icon: prometheus.png
         href: "{{HOMEPAGE_VAR_URL_PROMETHEUS}}"
         description: Metriken
+        siteMonitor: http://prometheus:9090
