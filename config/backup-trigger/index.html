@@ -49,7 +49,9 @@
 
     <dl>
       <dt>Letztes Backup</dt><dd id="age">wird geladen …</dd>
+      <dt>Dauer</dt><dd id="dur">–</dd>
       <dt>Platte</dt><dd id="disk">–</dd>
+      <dt>Füllstand</dt><dd id="pct">–</dd>
       <dt>Datastore</dt><dd id="store">–</dd>
     </dl>
 
@@ -78,9 +80,23 @@ async function refresh() {
     age.textContent = s.last_success
       ? `vor ${days.toFixed(1)} Tagen (${new Date(s.last_success * 1000).toLocaleString('de-DE')})`
       : 'noch nie gelaufen';
-    document.getElementById('disk').textContent  = s.disk  || '–';
-    document.getElementById('store').textContent = s.datastore_online
-      ? 'angesteckt' : 'nicht angesteckt';
+    document.getElementById('dur').textContent  = s.duration_text || '–';
+    document.getElementById('disk').textContent = s.disk || '–';
+    // -1 heißt "noch keine Belegung bekannt" (vor dem ersten Lauf).
+    document.getElementById('pct').textContent =
+      (typeof s.used_percent === 'number' && s.used_percent >= 0)
+        ? s.used_percent + ' % belegt' : '–';
+    // "abgezogen" ist der Normalzustand, nicht der Fehlerfall – deshalb hier
+    // keine Warnfarbe.
+    const btn = document.getElementById('go');
+    if (s.running) {
+      document.getElementById('store').textContent = 'Backup läuft gerade …';
+      btn.disabled = true;
+    } else {
+      document.getElementById('store').textContent = s.datastore_online
+        ? 'angesteckt' : 'abgezogen (normal)';
+      btn.disabled = false;
+    }
   } catch (e) {
     age.textContent = 'Status nicht lesbar';
   }
@@ -104,7 +120,11 @@ document.getElementById('go').addEventListener('click', async (ev) => {
     msg.textContent = 'Auslösen fehlgeschlagen (' + e.message + '). '
                     + 'Der 10-Minuten-Timer greift trotzdem.';
   } finally {
-    setTimeout(() => { btn.disabled = false; refresh(); }, 5000);
+    // Den Knopf NICHT hier wieder freigeben: refresh() kennt den wahren Zustand
+    // (läuft/läuft nicht) und schaltet ihn entsprechend. Beides zu tun ergäbe
+    // einen kurzen Moment, in dem der Knopf während eines laufenden Backups
+    // wieder klickbar wäre.
+    setTimeout(refresh, 5000);
   }
 });
 

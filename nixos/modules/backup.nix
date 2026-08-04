@@ -102,7 +102,7 @@ in
   systemd.services.apphost-media-backup = {
     description = "Back up VM payload data to the attached removable PBS datastore";
     after = [ "docker.service" ];
-    path  = [ pkgs.proxmox-backup-client pkgs.curl pkgs.coreutils pkgs.gnugrep pkgs.bash ];
+    path  = [ pkgs.proxmox-backup-client pkgs.curl pkgs.jq pkgs.coreutils pkgs.gnugrep pkgs.bash ];
     # Läuft die Platte gerade nicht, endet das Skript mit 0 – ein Fehlschlag
     # bedeutet hier also wirklich einen Fehler und darf pushen.
     onFailure = [ "apphost-notify-failure@%n.service" ];
@@ -148,7 +148,7 @@ in
   systemd.services.apphost-media-backup-forced = {
     description = "Manually triggered payload backup (button on backup.<domain>)";
     after = [ "docker.service" ];
-    path  = [ pkgs.proxmox-backup-client pkgs.curl pkgs.coreutils pkgs.gnugrep pkgs.bash ];
+    path  = [ pkgs.proxmox-backup-client pkgs.curl pkgs.jq pkgs.coreutils pkgs.gnugrep pkgs.bash ];
     onFailure = [ "apphost-notify-failure@%n.service" ];
     serviceConfig = {
       Type = "oneshot";
