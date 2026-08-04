@@ -22,24 +22,33 @@ dc() { docker compose "$@"; }
 # kein Healthcheck). Bricht nach PHASE_TIMEOUT ab und fährt trotzdem fort.
 wait_ready() {
     local start now cid health state pending svc
+    local -a haenger
     start=$(date +%s)
     while :; do
         pending=0
+        haenger=()
         for svc in "$@"; do
             cid=$(dc ps -q "$svc" 2>/dev/null | head -1)
-            if [[ -z "$cid" ]]; then pending=1; continue; fi
+            if [[ -z "$cid" ]]; then pending=1; haenger+=("$svc (kein Container)"); continue; fi
             health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || echo none)
             state=$(docker inspect -f '{{.State.Status}}' "$cid" 2>/dev/null || echo missing)
             case "$health" in
                 healthy) : ;;
-                none)    [[ "$state" == running ]] || pending=1 ;;
-                *)       pending=1 ;;   # starting / unhealthy -> weiter warten
+                none)    [[ "$state" == running ]] || { pending=1; haenger+=("$svc ($state)"); } ;;
+                *)       pending=1; haenger+=("$svc ($state, health: $health)") ;;
             esac
         done
         [[ "$pending" -eq 0 ]] && return 0
         now=$(date +%s)
         if [[ $((now - start)) -ge "$PHASE_TIMEOUT" ]]; then
-            echo "    ! Timeout (${PHASE_TIMEOUT}s) – fahre trotzdem fort."
+            # Nicht nur "Timeout" melden: ohne die Namen sucht man den Grund
+            # anschließend im gesamten Stack. Genau das ist passiert, als
+            # backup-trigger im Kreisel lief (fehlendes /srv/hook) und die
+            # Phase 180 Sekunden lang wortlos wartete.
+            echo "    ! Timeout (${PHASE_TIMEOUT}s) – nicht bereit:"
+            printf '        %s\n' "${haenger[@]}"
+            echo "      Ursache steht im Log:  docker logs ${haenger[0]%% *} --tail 50"
+            echo "      Die nächste Phase startet trotzdem."
             return 0
         fi
         sleep 3
