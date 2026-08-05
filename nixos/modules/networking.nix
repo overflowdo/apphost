@@ -40,6 +40,49 @@
   # nftables Firewall
   networking.nftables = {
     enable = true;
+
+    # KEIN "flush ruleset" beim Neuladen – sonst nimmt jeder `rebuild` Docker
+    # die Beine weg. Symptom:
+    #   Failed to Setup IP tables: Unable to enable ACCEPT OUTGOING rule:
+    #   iptables -A DOCKER-FORWARD ...: No chain/target/match by that name
+    # Docker legt seine Ketten (DOCKER-FORWARD, DOCKER-USER, ip nat/DOCKER, …)
+    # ausschließlich beim Daemon-Start an. Sie liegen über iptables-nft im
+    # selben Kernel-Regelwerk wie unseres. Das NixOS-Modul setzt
+    # flushRuleset auf true, sobald `ruleset` gesetzt ist
+    # (nixos/modules/services/networking/nftables.nix), und die Unit hat
+    # reloadIfChanged = true – ein `rebuild` lädt also neu, spült dabei ALLES
+    # und Docker steht ohne seine Ketten da. Bestehende Container verlieren
+    # ihre Weiterleitung, neue Netze lassen sich gar nicht mehr anlegen. Bis
+    # dahin half nur `systemctl restart docker`.
+    #
+    # Statt alles zu spülen, räumen wir genau unser eigenes weg: die Tabelle
+    # inet filter (die benutzt Docker nicht, es arbeitet in ip filter) und in
+    # ip nat NUR unsere Kette `postrouting` – Dockers POSTROUTING und DOCKER
+    # in derselben Tabelle bleiben stehen.
+    #
+    # Die Reihenfolge "erst anlegen, dann löschen" ist der vom Modul selbst
+    # dokumentierte Kniff: so ist das Löschen eines nicht vorhandenen Objekts
+    # kein Fehler. `flush chain` vor `delete chain`, weil delete an einer
+    # Kette mit Regeln scheitert.
+    #
+    # Nachgemessen in einem eigenen Netz-Namespace: 5 Reload-Zyklen
+    # hintereinander lassen Dockers Ketten unangetastet und erzeugen weiterhin
+    # genau eine masquerade-Regel (keine Anhäufung); mit `flush ruleset` sind
+    # Dockers Ketten danach weg – also genau der Fehler oben.
+    flushRuleset = false;
+    extraDeletions = ''
+      table inet filter
+      delete table inet filter
+
+      table ip nat
+      table ip nat {
+        chain postrouting {
+        }
+      }
+      flush chain ip nat postrouting
+      delete chain ip nat postrouting
+    '';
+
     ruleset = ''
       # Alles wird geblockt, nur explizit erlaubte Verbindungen werden zugelassen
 
