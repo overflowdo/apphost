@@ -18,7 +18,7 @@
 { ... }:
 {
   fileSystems."/mnt/media" = {
-    device = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1";
+    device = "/dev/disk/by-id/usb-WD_Elements_25A3_575833324433333030524C30-0:0";
     fsType = "btrfs";
     options = [
       "nofail"
