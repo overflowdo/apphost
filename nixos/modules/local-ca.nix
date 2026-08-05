@@ -111,11 +111,26 @@ in {
       #    install.sh ausdrücklich offenhält). Mit diesem Bundle gilt beides.
       #    Wird bei jedem Lauf neu geschrieben, damit Aktualisierungen der
       #    System-CAs mitkommen.
+      #    VORHER AUFRÄUMEN: Startet ein Container mit
+      #    "- /var/lib/apphost-ca/ca-bundle.crt:/certs/ca-bundle.crt:ro", bevor
+      #    diese Datei existiert, legt Docker an der Stelle ein VERZEICHNIS an.
+      #    Danach ist `mv -f datei verzeichnis` kein Fehler mehr – mv schiebt die
+      #    Datei stillschweigend HINEIN. Das Bundle landete also in
+      #    ca-bundle.crt/ca-bundle.crt.tmp, während Grafana, Paperless und
+      #    collaboration weiterhin ein Verzeichnis als Truststore gemountet
+      #    bekamen: TLS-Prüfung dauerhaft kaputt, ohne dass irgendetwas abstürzt.
+      #    Deshalb hier wegräumen (Inhalt kann nur unser eigener Rest sein) und
+      #    unten mit -T schreiben, damit derselbe Fehler künftig laut scheitert
+      #    statt sich zu verstecken.
+      if [ -d ca-bundle.crt ]; then
+        echo "local-ca: ca-bundle.crt ist ein Verzeichnis (von Docker angelegt) – wird entfernt"
+        rm -rf ca-bundle.crt
+      fi
       if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
         cat /etc/ssl/certs/ca-certificates.crt local-ca.crt > ca-bundle.crt.tmp
-        mv -f ca-bundle.crt.tmp ca-bundle.crt
+        mv -fT ca-bundle.crt.tmp ca-bundle.crt
       else
-        cp -f local-ca.crt ca-bundle.crt
+        cp -fT local-ca.crt ca-bundle.crt
       fi
 
       # 4. Rechte:
