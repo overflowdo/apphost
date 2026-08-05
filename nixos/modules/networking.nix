@@ -69,6 +69,17 @@
     # hintereinander lassen Dockers Ketten unangetastet und erzeugen weiterhin
     # genau eine masquerade-Regel (keine Anhäufung); mit `flush ruleset` sind
     # Dockers Ketten danach weg – also genau der Fehler oben.
+    #
+    # EINMALIG BEIM UMSTELLEN: Der allererste rebuild nach dieser Änderung
+    # spült trotzdem noch. Das Modul baut sein Skript als
+    #     include "/var/lib/nftables/deletions.nft"   # previous deletions
+    #     include "<neues Lösch-Skript>"              # current deletions
+    # und die gespeicherte Datei stammt noch aus der Generation davor – sie
+    # enthält also "flush ruleset". Erst ExecStartPost überschreibt sie mit der
+    # Fassung von hier. Nach diesem einen Mal also noch
+    #   sudo systemctl restart docker
+    # Prüfen lässt sich das an  cat /var/lib/nftables/deletions.nft :
+    # dort darf danach kein "flush ruleset" mehr stehen.
     flushRuleset = false;
     extraDeletions = ''
       table inet filter
