@@ -55,7 +55,20 @@ wait_ready() {
     done
 }
 
-ram() { LC_ALL=C free -m | awk '/^Mem/{printf "    RAM: %s/%s MB benutzt\n",$3,$2}'; }
+# "3140/6604 MB benutzt" war missverständlich – die zweite Zahl ist die
+# GESAMTGRÖSSE, nicht ein zweiter Verbrauchswert. Jetzt ausgeschrieben.
+#
+# Die Gesamtgröße ist die, die das GASTSYSTEM sieht. Weicht sie von dem ab, was
+# der VM in Proxmox zugeteilt ist, und schwankt sie zwischen den Phasen, dann
+# ist das Ballooning: bei "Ballooning Device" mit min < max nimmt der Host der
+# VM unter Druck Speicher weg, und `free` zeigt entsprechend weniger total.
+# Prüfen auf dem Proxmox-Host:  qm config <vmid> | grep -E 'memory|balloon'
+# Feste Größe = min gleich max setzen (bzw. Ballooning abschalten).
+ram() {
+    LC_ALL=C free -m | awk '/^Mem/{
+        printf "    RAM: %s MB von %s MB belegt, %s MB frei\n", $3, $2, $7
+    }'
+}
 
 phase() {
     local title="$1"; shift

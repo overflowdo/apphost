@@ -24,8 +24,18 @@
 #     bekommen. Ein /-Mount in einen Container mit Ingress ist genau das, was
 #     bei cAdvisor gerade entfernt wurde. Plattenplatz steht im Grafana-
 #     Dashboard und löst als MediaDiskSpaceLow/-Critical ohnehin Alarm aus.
+# KEIN uptime: Homepage zeichnet zu JEDEM Wert dieses Widgets einen
+# Fortschrittsbalken. Bei CPU und Speicher ergibt das einen Sinn (Anteil von
+# 100 % bzw. vom Gesamtspeicher), bei einer Betriebszeit nicht – ein Balken
+# bräuchte ein Maximum, und "22 h von wie viel?" gibt es nicht. Die Option
+# lässt sich nicht einzeln abschalten, also fliegt der Wert raus.
+#
+# ZUR SPEICHERANZEIGE: Homepage zeigt hier den FREIEN Speicher ("3,1 GiB Frei"),
+# nicht den belegten – das ist so vorgesehen und nicht umstellbar; die
+# resources-Optionen kennen nur an/aus je Größe. Wer "belegt von gesamt"
+# sehen will, findet es im Grafana-Dashboard "Node Exporter Full", und `up`
+# schreibt es nach jeder Phase in die Konsole.
 - resources:
     label: System
     cpu: true
     memory: true
-    uptime: true
