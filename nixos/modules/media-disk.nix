@@ -18,7 +18,7 @@
 { ... }:
 {
   fileSystems."/mnt/media" = {
-    device = "/dev/disk/by-uuid/sdb";
+    device = "/dev/sdb";
     fsType = "btrfs";
     options = [
       "nofail"
