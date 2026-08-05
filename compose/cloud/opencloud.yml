@@ -102,6 +102,18 @@ services:
       COLLABORATION_HTTP_ADDR: 0.0.0.0:9300
       MICRO_REGISTRY: "nats-js-kv"
       MICRO_REGISTRY_ADDRESS: "opencloud:9233"
+      # MICRO_REGISTRY_ADDRESS deckt nur die Dienst-Registrierung ab. Der
+      # Ereignisbus (nats/JetStream) ist eine EIGENE Einstellung und stand auf
+      # ihrem Default 127.0.0.1:9233 – also auf dem collaboration-Container
+      # selbst, wo kein nats läuft. Ergebnis war eine Fehlermeldung im Minuten-
+      # takt, dauerhaft:
+      #   error connecting to nats cluster opencloud-cluster: error connecting
+      #   to nats at 127.0.0.1:9233 ... no servers available for connection
+      # nats läuft im opencloud-Container (NATS_NATS_HOST: 0.0.0.0, weiter
+      # oben). OC_CACHE_STORE_NODES gehört laut OpenCloud-Doku auf denselben
+      # Wert, damit Cache und Ereignisbus dieselbe nats-Instanz benutzen.
+      OC_EVENTS_ENDPOINT: "opencloud:9233"
+      OC_CACHE_STORE_NODES: "opencloud:9233"
       COLLABORATION_WOPI_SRC: https://${WOPISERVER_SUBDOMAIN:-wopi}.${DOMAIN}
       COLLABORATION_APP_NAME: "CollaboraOnline"
       COLLABORATION_APP_PRODUCT: "Collabora"

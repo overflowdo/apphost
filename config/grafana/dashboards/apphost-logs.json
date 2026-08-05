@@ -68,7 +68,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (service) (rate({service=~\".+\"} |~ `(?i)(error|fatal|panic)` [5m]))",
+          "expr": "sum by (service) (rate({service=~\".+\"} |~ `(?i)(\"level\":\\s*\"(error|fatal|panic|crit)\"|\\[(err|error|fatal|crit|emerg)\\]|\\]\\s(error|fatal|panic):\\s)` [5m]))",
           "queryType": "range",
           "legendFormat": "{{service}}"
         }
@@ -190,7 +190,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service=~\".+\"} |~ `(?i)(error|fatal|panic)` [1h]))",
+          "expr": "sum(count_over_time({service=~\".+\"} |~ `(?i)(\"level\":\\s*\"(error|fatal|panic|crit)\"|\\[(err|error|fatal|crit|emerg)\\]|\\]\\s(error|fatal|panic):\\s)` [1h]))",
           "queryType": "range"
         }
       ],
@@ -256,7 +256,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service=~\".+\"} |~ `(?i)(warn)` [1h]))",
+          "expr": "sum(count_over_time({service=~\".+\"} |~ `(?i)(\"level\":\\s*\"(warn|warning)\"|\\[(wrn|warn|warning)\\]|\\]\\s(warn|warning):\\s)` [1h]))",
           "queryType": "range"
         }
       ],
@@ -314,7 +314,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service=~\"$service\"} |~ `(?i)(error|warn|fatal|panic|fail)`",
+          "expr": "{service=~\"$service\"} |~ `(?i)(\"level\":\\s*\"(error|fatal|panic|crit|warn|warning)\"|\\[(err|error|fatal|crit|emerg|wrn|warn|warning)\\]|\\]\\s(error|fatal|panic|warn|warning):\\s)`",
           "queryType": "range"
         }
       ],

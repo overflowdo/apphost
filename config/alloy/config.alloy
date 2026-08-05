@@ -66,6 +66,19 @@ loki.process "drop_noise" {
     expression          = ".*failed to register collector with remote server.*"
     drop_counter_reason = "alloy_remotecfg_noise"
   }
+
+  // Homepage laeuft mit read_only: true und will seinen Next.js-Prerender-Cache
+  // nach /app/.next/server/pages schreiben:
+  //   warn: Failed to update prerender cache for /en
+  //   Error: EROFS: read-only file system
+  // Folgenlos: ohne Cache rendert Next.js die Seite bei jedem Aufruf neu, und
+  // das Dashboard hat 17 statische Kacheln. Ein tmpfs an dieser Stelle ginge
+  // NICHT - dort liegen die vom Image mitgebrachten Seiten, ein Overlay wuerde
+  // sie verdecken. read_only fuer eine Zeile Log aufzugeben lohnt nicht.
+  stage.drop {
+    expression          = ".*Failed to update prerender cache.*"
+    drop_counter_reason = "homepage_prerender_cache_readonly"
+  }
 }
 
 // Host System Logs aus dem systemd-Journal.
