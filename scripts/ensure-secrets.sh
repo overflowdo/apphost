@@ -40,6 +40,46 @@ if [[ -f .env ]] && grep -qE '^[[:space:]]*[A-Z_][A-Z0-9_]*=[^'"'"'"#]*\$\$' .en
     echo
 fi
 
+# Dieselbe Falle wie unten, aber auf HOST-Seite: Dateien aus /var/lib, die per
+# Bind-Mount in Container gehen. Existiert die Datei beim Erzeugen des
+# Containers nicht, legt Docker dort ein VERZEICHNIS an – und zwar auf dem
+# Host, wo es dann liegen bleibt.
+#
+# Passiert ist das mit /var/lib/apphost-ca/ca-bundle.crt. Folge: grafana,
+# paperless und collaboration bekamen ein Verzeichnis als Zertifikatsbündel
+# untergeschoben. Der einzige Hinweis war eine Warnung im Minutentakt
+#   tls: failed to verify certificate: x509: certificate signed by unknown
+#   authority
+# Kein Container stirbt daran, es funktioniert nur die TLS-Prüfung nicht mehr –
+# also genau die Sorte Fehler, die monatelang übersehen wird.
+#
+# Diese Dateien erzeugt nixos/modules/local-ca.nix, nicht ein Skript hier;
+# deshalb nur melden und abbrechen statt selbst reparieren.
+CA_FILES=(
+    /var/lib/apphost-ca/ca-bundle.crt
+    /var/lib/apphost-ca/local-ca.crt
+)
+ca_kaputt=()
+for f in "${CA_FILES[@]}"; do
+    [[ -d "$f" ]] && ca_kaputt+=("$f")
+done
+if [[ ${#ca_kaputt[@]} -gt 0 ]]; then
+    echo "FEHLER: Docker hat aus diesen CA-Dateien Verzeichnisse gemacht:" >&2
+    printf '  %s\n' "${ca_kaputt[@]}" >&2
+    cat >&2 <<'HINWEIS'
+Betroffene Container prüfen TLS damit nicht mehr (Grafana, Paperless,
+collaboration). So geradeziehen:
+
+  docker compose stop grafana paperless collaboration
+  sudo rmdir /var/lib/apphost-ca/ca-bundle.crt /var/lib/apphost-ca/local-ca.crt 2>/dev/null
+  sudo systemctl restart apphost-local-ca.service
+  ls -l /var/lib/apphost-ca/          # müssen jetzt Dateien sein
+  docker compose rm -sf grafana paperless collaboration
+  up
+HINWEIS
+    exit 1
+fi
+
 # "<datei>:<generator>" – alle Dateien, die in compose/**/*.yml per Bind-Mount
 # eingehängt werden. Neue secret-basierte Dienste hier ergänzen.
 SECRETS=(

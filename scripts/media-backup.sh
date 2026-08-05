@@ -39,29 +39,6 @@ MIN_INTERVAL="${MIN_INTERVAL:-86400}"
 
 log() { echo "media-backup: $*"; }
 
-[[ $EUID -eq 0 ]] || { echo "Bitte als root ausführen (liest /var/lib/docker/volumes)." >&2; exit 1; }
-
-if [[ ! -f "$CONF" ]]; then
-    log "$CONF fehlt – Backup nicht eingerichtet. Siehe Installationsanleitung, Kapitel Backup."
-    exit 0
-fi
-# shellcheck source=/dev/null
-source "$CONF"
-
-: "${PBS_HOST:?PBS_HOST fehlt in $CONF}"
-: "${PBS_TOKEN:?PBS_TOKEN fehlt in $CONF}"
-: "${PBS_SECRET:?PBS_SECRET fehlt in $CONF}"
-: "${PBS_DATASTORES:?PBS_DATASTORES fehlt in $CONF}"
-KEYFILE="${PBS_KEYFILE:-$ROOT_DIR/secrets/pbs-encryption.key}"
-
-mkdir -p "$STATE_DIR" "$WEB_DIR" "$TEXTFILE_DIR"
-
-# proxmox-backup-client liest das Token-Geheimnis aus PBS_PASSWORD und den
-# Zertifikats-Fingerabdruck aus PBS_FINGERPRINT. Beides über die Umgebung, nicht
-# über argv – auf dem Host ist argv per `ps` für jeden lesbar.
-export PBS_PASSWORD="$PBS_SECRET"
-[[ -n "${PBS_FINGERPRINT:-}" ]] && export PBS_FINGERPRINT
-
 # --- Metrik + Statusdatei neu erzeugen -------------------------------------
 # Die .prom-Datei wird bei JEDEM Lauf aus allen Zustandsdateien neu gebaut, nicht
 # fortgeschrieben. Sonst verschwände der Zeitstempel der gerade nicht
@@ -173,6 +150,44 @@ write_metrics() {  # <aktueller-datastore-oder-leer> <online 0|1> <running 0|1>
     chmod 0644 "$tmp"
     mv -f "$tmp" "$WEB_DIR/status.json"
 }
+
+[[ $EUID -eq 0 ]] || { echo "Bitte als root ausführen (liest /var/lib/docker/volumes)." >&2; exit 1; }
+
+# Verzeichnisse VOR dem ersten möglichen Abbruch anlegen: die Statusdatei muss
+# auch dann entstehen, wenn das Backup noch gar nicht eingerichtet ist (siehe
+# direkt darunter).
+mkdir -p "$STATE_DIR" "$WEB_DIR" "$TEXTFILE_DIR"
+
+if [[ ! -f "$CONF" ]]; then
+    log "$CONF fehlt – Backup nicht eingerichtet. Siehe Installationsanleitung, Kapitel Backup."
+    # Trotzdem eine Statusdatei schreiben. Vorher endete das Skript hier ohne
+    # eine – und damit gab es /status.json nie, solange `backup-setup` nicht
+    # gelaufen war. Der backup-trigger-Container lieferte dafür 404, und die
+    # Homepage-Kachel zeigte "API-Fehler Informationen" statt der Wahrheit:
+    # "noch nie gesichert". Ein nicht eingerichtetes Backup ist kein
+    # Anzeigefehler, es soll als "nie" dastehen.
+    # PBS_DATASTORES kommt sonst aus $CONF; ohne Default bräche write_metrics
+    # unter `set -u` ab.
+    PBS_DATASTORES=""
+    write_metrics "" 0 0
+    exit 0
+fi
+# shellcheck source=/dev/null
+source "$CONF"
+
+: "${PBS_HOST:?PBS_HOST fehlt in $CONF}"
+: "${PBS_TOKEN:?PBS_TOKEN fehlt in $CONF}"
+: "${PBS_SECRET:?PBS_SECRET fehlt in $CONF}"
+: "${PBS_DATASTORES:?PBS_DATASTORES fehlt in $CONF}"
+KEYFILE="${PBS_KEYFILE:-$ROOT_DIR/secrets/pbs-encryption.key}"
+
+
+# proxmox-backup-client liest das Token-Geheimnis aus PBS_PASSWORD und den
+# Zertifikats-Fingerabdruck aus PBS_FINGERPRINT. Beides über die Umgebung, nicht
+# über argv – auf dem Host ist argv per `ps` für jeden lesbar.
+export PBS_PASSWORD="$PBS_SECRET"
+[[ -n "${PBS_FINGERPRINT:-}" ]] && export PBS_FINGERPRINT
+
 
 # --- Welche Platte steckt? --------------------------------------------------
 REPO=""
