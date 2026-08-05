@@ -40,6 +40,75 @@ if [[ -f .env ]] && grep -qE '^[[:space:]]*[A-Z_][A-Z0-9_]*=[^'"'"'"#]*\$\$' .en
     echo
 fi
 
+# Datenverzeichnisse auf der Bulk-Platte: gehören sie der falschen UID, startet
+# der zugehörige Dienst nicht, sondern kreiselt.
+#
+# nixos/modules/media-dirs.nix legt sie beim Boot mit den richtigen Rechten an –
+# aber nur, WENN /mnt/media gemountet ist; sonst überspringt die Unit still
+# (bewusst: nofail, das System soll ohne Bulk-Platte booten). Ist sie
+# übersprungen und startet danach ein Container, legt Docker die fehlende
+# Bind-Quelle selbst an: als remapped root mit 0755. Der Dienst läuft dann als
+# UID 1000 bzw. 2999 und darf dort nicht schreiben:
+#   opencloud: Can't start JetStream: mkdir /var/lib/opencloud/nats:
+#              permission denied
+#   radicale:  [Errno 13] Permission denied: '/data/collections'
+# Beide melden das als fatal, Docker startet sie neu, und das geht endlos so
+# weiter. Von aussen sieht man nur zwei Container, die nicht hochkommen.
+if [[ -d /mnt/media ]] && ! mountpoint -q /mnt/media 2>/dev/null; then
+    echo "FEHLER: /mnt/media ist nicht gemountet." >&2
+    cat >&2 <<'HINWEIS'
+Damit landen Immich-Fotos, Paperless-Dokumente und OpenCloud-Dateien auf der
+Systemplatte statt auf der Bulk-Platte – und zwar unbemerkt, weil die Dienste
+einfach in das leere Verzeichnis schreiben. Der Mount ist in
+nixos/modules/media-disk.nix deklariert (nofail), das System bootet also auch
+ohne die Platte durch. Nachsehen:
+
+  systemctl status mnt-media.mount --no-pager -l
+  ls -l /dev/disk/by-id/ | grep -i scsi1     # ist die Platte durchgereicht?
+  lsblk -f                                   # Dateisystem in Ordnung?
+
+Fehlt das Gerät, hängt die Platte nicht (mehr) an scsi1 der VM – auf dem
+Proxmox-Host mit `qm config <vmid>` prüfen.
+HINWEIS
+    exit 1
+fi
+
+if [[ -d /mnt/media ]]; then
+    base="$(awk -F: '$1=="dockremap"{print $2}' /etc/subuid 2>/dev/null | head -1)"
+    if [[ -n "${base:-}" ]]; then
+        # "<dienst>:<erlaubte Offsets, durch Komma>" – Ableitung wie in
+        # nixos/modules/media-dirs.nix. paperless darf BEIDES sein: die Unit
+        # setzt Basis+0, der Entrypoint chownt beim ersten Start selbst auf
+        # Container-UID 1000 (= Basis+1000). Beides ist ein gesunder Zustand.
+        falsch=()
+        for eintrag in "immich:0" "paperless:0,1000" "opencloud:1000" "radicale:2999"; do
+            svc="${eintrag%%:*}"; offsets="${eintrag##*:}"
+            dir="/mnt/media/$svc"
+            [[ -d "$dir" ]] || continue
+            ist="$(stat -c %u "$dir" 2>/dev/null || echo '?')"
+            ok=0; erwartet=""
+            for off in ${offsets//,/ }; do
+                erwartet+="$((base + off)) "
+                [[ "$ist" == "$((base + off))" ]] && ok=1
+            done
+            [[ "$ok" == 1 ]] || falsch+=("$dir: gehört $ist, erwartet ${erwartet% }")
+        done
+        if [[ ${#falsch[@]} -gt 0 ]]; then
+            echo "FEHLER: Datenverzeichnisse mit falschem Eigentümer:" >&2
+            printf '  %s\n' "${falsch[@]}" >&2
+            cat >&2 <<'HINWEIS'
+Betroffene Dienste kreiseln damit beim Start (OpenCloud: JetStream-Store,
+Radicale: /data/collections). Richten:
+
+  sudo systemctl restart apphost-media-dirs.service
+  ls -land /mnt/media/*
+  up
+HINWEIS
+            exit 1
+        fi
+    fi
+fi
+
 # Dieselbe Falle wie unten, aber auf HOST-Seite: Dateien aus /var/lib, die per
 # Bind-Mount in Container gehen. Existiert die Datei beim Erzeugen des
 # Containers nicht, legt Docker dort ein VERZEICHNIS an – und zwar auf dem
