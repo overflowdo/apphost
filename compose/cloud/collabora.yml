@@ -14,7 +14,7 @@ services:
     # in environment: unten). Ein Wechsel auf 26.04 ist eine eigene Migration
     # mit Prüfung der Optionen, kein Einzeiler – und nichts, was nebenbei über
     # einen Abhängigkeits-PR passieren sollte.
-    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    image: collabora/code:26.04.2.4.1@sha256:1f864ce3f0c49e867787b6dd303bd6ba989542d3023f6809df558eafd04c1b97
     container_name: collabora
     restart: unless-stopped
     runtime: runc
