@@ -9,7 +9,7 @@ services:
   # ReverseProxyAuthMiddleware), es gibt KEINEN zweiten Grocy-Login mehr. Der
   # Authelia-Login (custom Passwort) ist die einzige Anmeldung.
   grocy:
-    image: lscr.io/linuxserver/grocy:4.6.0@sha256:1efa34ad8fbfff8a7c146e00b5af0cbd768352dfbb23acca0bad35796190d7ff
+    image: lscr.io/linuxserver/grocy:4.6.0@sha256:0a59bdad2a45f5b7aef1549d80dca8e8296facb66b6fdb38868818ba5b93c20b
     container_name: grocy
     restart: unless-stopped
     runtime: runc
