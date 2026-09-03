@@ -111,7 +111,7 @@ services:
     labels:
       - "traefik.enable=false"
   immich-redis:
-    image: docker.io/valkey/valkey:8-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84
+    image: docker.io/valkey/valkey:8-alpine@sha256:b21fd94099dcd4bc6b2b9230daef69b6558b887ad4a2a1afe56ff6e745a88cdb
     container_name: immich-redis
     restart: unless-stopped
     runtime: runc
