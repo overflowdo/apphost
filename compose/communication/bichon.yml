@@ -3,7 +3,7 @@ volumes:
   bichon_data: {name: apphost_bichon_data}
 services:
   bichon:
-    image: rustmailer/bichon:1.6.2@sha256:1f15a8e3d64589f2a0d6e486004eb54f345741de6e7d3589d961a07c22ca8e00
+    image: rustmailer/bichon:2.0.3@sha256:fa6a04db651a43c734c1f92eb48c48c78eaf23c0d387356dfc6041abdf73587a
     container_name: bichon
     restart: unless-stopped
     runtime: runc
