@@ -109,7 +109,7 @@ services:
       - "traefik.enable=false"
   # redis_exporter für die immich-Valkey-Instanz (ohne Passwort, media-network)
   immich-redis-exporter:
-    image: oliver006/redis_exporter:v1.88.0-alpine@sha256:db6df2026585151c2209aa1f21c8856da883cf933b0943c0e51d1f4b3acf1a8d
+    image: oliver006/redis_exporter:v1.92.0-alpine@sha256:b07ce24af20faeb4033a91dd30c2639dba6fc059cdfec97ecc7d320dab4f43cb
     container_name: immich-redis-exporter
     restart: unless-stopped
     runtime: runc
@@ -128,7 +128,7 @@ services:
       - "traefik.enable=false"
   # redis_exporter für die paperless-Valkey-Instanz (Passwort, documents-network)
   paperless-redis-exporter:
-    image: oliver006/redis_exporter:v1.88.0-alpine@sha256:db6df2026585151c2209aa1f21c8856da883cf933b0943c0e51d1f4b3acf1a8d
+    image: oliver006/redis_exporter:v1.92.0-alpine@sha256:b07ce24af20faeb4033a91dd30c2639dba6fc059cdfec97ecc7d320dab4f43cb
     container_name: paperless-redis-exporter
     restart: unless-stopped
     runtime: runc
