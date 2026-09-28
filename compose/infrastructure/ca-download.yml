@@ -6,7 +6,7 @@ services:
   # nixos/modules/local-ca.nix; hier wird nur die .crt read-only eingehängt
   # (NIEMALS ca.key – der bleibt auf dem Host).
   ca-download:
-    image: nginxinc/nginx-unprivileged:1.31-alpine@sha256:6a23acdfca2b9cfbcec61419e3f1426bcbedb91362f2f19306a8567423bb4612
+    image: nginxinc/nginx-unprivileged:1.31-alpine@sha256:26b0bf6fbf07297983cb341998d79c831508787de26627dd2a112321b9c3a4af
     container_name: ca-download
     restart: unless-stopped
     runtime: runc
