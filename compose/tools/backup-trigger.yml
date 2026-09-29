@@ -18,7 +18,7 @@ services:
   # macht eine systemd.path-Unit auf dem Host. Wer diesen Container übernimmt,
   # kann Backups auslösen – mehr nicht.
   backup-trigger:
-    image: nginxinc/nginx-unprivileged:1.31-alpine@sha256:6a23acdfca2b9cfbcec61419e3f1426bcbedb91362f2f19306a8567423bb4612
+    image: nginxinc/nginx-unprivileged:1.31-alpine@sha256:26b0bf6fbf07297983cb341998d79c831508787de26627dd2a112321b9c3a4af
     container_name: backup-trigger
     restart: unless-stopped
     runtime: runc
