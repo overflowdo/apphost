@@ -3,7 +3,7 @@ volumes:
   opencloud_config: {name: apphost_opencloud_config}
 services:
   opencloud:
-    image: opencloudeu/opencloud-rolling:7.4.0@sha256:e9df43040866c3587daae47af68bc3c412026bc99614686bf6869bdc72c52526
+    image: opencloudeu/opencloud-rolling:7.5.0@sha256:6db1cfb06d430a663f16e9f33dcd4596d82a4875be0b4df233c26ce5f667ea74
     container_name: opencloud
     restart: unless-stopped
     runtime: runc
@@ -65,7 +65,7 @@ services:
       - "traefik.http.services.opencloud.loadbalancer.server.port=9200"
       - "traefik.http.routers.opencloud.middlewares=opencloud-chain@file"
   collaboration:
-    image: opencloudeu/opencloud-rolling:7.4.0@sha256:e9df43040866c3587daae47af68bc3c412026bc99614686bf6869bdc72c52526
+    image: opencloudeu/opencloud-rolling:7.5.0@sha256:6db1cfb06d430a663f16e9f33dcd4596d82a4875be0b4df233c26ce5f667ea74
     container_name: collaboration
     # War der einzige Container im Stack mit restart: always statt
     # unless-stopped (ein von Hand gestoppter Dienst kam beim nächsten
