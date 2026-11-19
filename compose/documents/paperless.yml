@@ -84,7 +84,7 @@ services:
       - "traefik.http.services.paperless.loadbalancer.server.port=8000"
       - "traefik.http.routers.paperless.middlewares=strip-remote-user@file,default-chain@file"
   paperless-redis:
-    image: valkey/valkey:8-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+    image: valkey/valkey:8-alpine@sha256:9971099af41c36e887aabdfe22b80c0fe45df949163dfc9cb434febc57cfc3fc
     container_name: paperless-redis
     restart: unless-stopped
     runtime: runc
