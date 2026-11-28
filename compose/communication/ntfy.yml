@@ -3,7 +3,7 @@ volumes:
   ntfy_data: {name: apphost_ntfy_data}
 services:
   ntfy:
-    image: binwiederhier/ntfy:v2.27.0@sha256:f2419f405127afa868f10985c1a41449e673477cee1eb19994339a5ae8b592e7
+    image: binwiederhier/ntfy:v2.38.3@sha256:874299b207a9815e7a0cf551b3a094241db7604fa2d274bbd86f569154b6ea51
     container_name: ntfy
     restart: unless-stopped
     runtime: runc
